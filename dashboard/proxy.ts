@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// One app, two hostnames. admin.rehletak.com is served from app/admin, everything else from app/staff.
+// One app, two hostnames. admin.rehletak.app is served from app/admin, everything else from app/staff.
 // Locally, admin.localhost:3000 and localhost:3000 do the same. Rewriting every path means /admin/* can't be
 // reached from the staff hostname. This is routing only: the backend still enforces who can do what.
 export function proxy(request: NextRequest) {

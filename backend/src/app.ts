@@ -14,8 +14,9 @@ import health from "./domains/health/health.routes.js";
 const app = new Hono()
   .use("*", logger())
   .use("*", secureHeaders())
+  // Only the staff and admin dashboards of this environment may call the API from a browser with cookies.
   .use("*", cors({
-    origin: process.env.DASHBOARD_URL!,
+    origin: (process.env.CORS_ORIGINS ?? "").split(",").map(o => o.trim()).filter(Boolean),
     credentials: true,
   }))
   .onError((err, c) => {

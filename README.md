@@ -4,7 +4,7 @@ pnpm workspace + Turborepo.
 
 ```
 backend/        Hono API + BullMQ worker + Prisma (Railway)
-dashboard/      Next.js: staff (app.rehletak.com) and admin (admin.rehletak.com) (Vercel)
+dashboard/      Next.js: staff (dashboard.rehletak.app) and admin (admin.rehletak.app) (Vercel)
 storefronts/*   One Next.js app per company (Vercel)
 ```
 

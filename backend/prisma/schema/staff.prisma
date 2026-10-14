@@ -4,7 +4,7 @@ enum StaffStatus {
   DELETED
 }
 
-// A company's employee, signing in to the dashboard on app.rehletak.com.
+// A company's employee, signing in to the dashboard on dashboard.rehletak.app.
 model Staff {
   id String @id @default(cuid())
 

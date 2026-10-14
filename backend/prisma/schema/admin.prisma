@@ -1,4 +1,4 @@
-// Platform admins, signing in to admin.rehletak.com. Not tied to any tenant: they can see across all of them.
+// Platform admins, signing in to admin.rehletak.app. Not tied to any tenant: they can see across all of them.
 
 enum AdminStatus {
   ACTIVE
