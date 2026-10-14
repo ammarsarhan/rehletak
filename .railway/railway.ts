@@ -23,17 +23,17 @@ export default defineRailway((ctx) => {
   const production = ctx.environment === "production";
 
   // BullMQ needs keys to never be evicted.
-  const queue = redis("redis-queue", { region: REGION });
+  const queue = redis("queue", { region: REGION });
   queue.deploy = { startCommand: redisStart("--maxmemory-policy noeviction --appendonly yes") };
-  queue.networking = { privateNetworkEndpoint: "redis-queue" };
+  queue.networking = { privateNetworkEndpoint: "queue" };
 
   // Cache only: evicts least-recently-used keys when full.
-  const cache = redis("redis-cache", { region: REGION });
+  const cache = redis("cache", { region: REGION });
   cache.deploy = { startCommand: redisStart("--maxmemory 256mb --maxmemory-policy allkeys-lru") };
-  cache.networking = { privateNetworkEndpoint: "redis-cache" };
+  cache.networking = { privateNetworkEndpoint: "cache" };
 
-  const queueVolume = volume("redis-queue-volume", { region: REGION, sizeMB: 500 });
-  const cacheVolume = volume("redis-cache-volume", { region: REGION, sizeMB: 500 });
+  const queueVolume = volume("queue-volume", { region: REGION, sizeMB: 500 });
+  const cacheVolume = volume("cache-volume", { region: REGION, sizeMB: 500 });
 
   // Built from the repo root so pnpm can resolve the workspace. Neon URLs are shared variables set per
   // environment, never stored here.
