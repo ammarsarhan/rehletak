@@ -1,5 +1,6 @@
 import { config } from "dotenv";
 
-// backend/.env holds local service settings; the repo-root .env.local is written by `neon checkout` / `neon env pull`
-// for whichever Neon branch is checked out. Earlier files win. On Railway neither file exists and env is injected.
+// backend/.env holds local settings, including the local Postgres; the repo-root .env.local is written by `neon env pull`
+// when you need to reach a Neon branch from your machine. Earlier files win, so comment out the two DATABASE_URL lines in
+// backend/.env to use it. On Railway neither file exists and env is injected.
 config({ path: [".env", "../.env.local"] });

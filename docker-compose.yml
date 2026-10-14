@@ -1,5 +1,18 @@
-# Local stand-ins for the two Railway Redis services. Postgres comes from a Neon dev branch, not from here.
+# Local stand-ins for Neon Postgres and the two Railway Redis services.
 services:
+  db:
+    # Same major version as the Neon project.
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rehletak
+    ports:
+      - "5432:5432"
+    volumes:
+      # Postgres 18 images keep data under /var/lib/postgresql/18, so mount the parent directory.
+      - db:/var/lib/postgresql
+
   cache:
     image: redis:8-alpine
     # A cache is allowed to forget: evict the least recently used keys once memory is full.
@@ -17,4 +30,5 @@ services:
       - queue:/data
 
 volumes:
+  db:
   queue:

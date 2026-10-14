@@ -9,8 +9,8 @@ export default defineConfig({
       // Default branch: no overrides, uses project defaults
       return {};
     }
-    // Long-lived branches that mirror git (main / staging / dev) never expire.
-    if (branch.name === "staging" || branch.name === "dev") {
+    // staging is long-lived like main; local development uses Docker Postgres, not a Neon branch.
+    if (branch.name === "staging") {
       return {};
     }
     if (!branch.exists) {
