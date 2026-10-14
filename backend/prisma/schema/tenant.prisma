@@ -1,0 +1,59 @@
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+// A company on the platform. Every tenant-owned row hangs off one of these.
+model Tenant {
+  id String @id @default(cuid())
+
+  // Stable, URL-safe identifier, e.g. "terhal". Used in logs, admin URLs and storage key prefixes.
+  slug   String       @unique
+  name   String
+  status TenantStatus @default(ACTIVE)
+
+  keys TenantKey[]
+
+  staff             Staff[]
+  staffSessions     StaffSession[]
+  staffInvitations  StaffInvitation[]
+  customers         Customer[]
+  customerSessions  CustomerSession[]
+  guestSessions     GuestSession[]
+  drivers           Driver[]
+  vehicles          Vehicle[]
+  vehicleImages     VehicleImage[]
+  trips             Trip[]
+  tripEvents        TripEvent[]
+  tripClasses       TripClass[]
+  tripReports       TripReport[]
+  tripStops         TripStop[]
+  tripExpenses      TripExpense[]
+  notifications     Notification[]
+  notificationItems NotificationDelivery[]
+  analytics         AnalyticsDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Secret keys a tenant's storefront BFF sends with its server-to-server requests. Only the hash is stored.
+// prefix is the first few characters of the key, kept in plain text so a key can be recognised in the dashboard.
+model TenantKey {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  name    String
+  prefix  String
+  keyHash String @unique
+
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}

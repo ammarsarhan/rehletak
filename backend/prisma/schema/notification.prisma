@@ -1,0 +1,72 @@
+enum NotificationChannel {
+  WHATSAPP
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  // Exactly one recipient is set.
+  customer       Customer?     @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  customerId     String?
+  guestSession   GuestSession? @relation(fields: [tenantId, guestSessionId], references: [tenantId, id], onDelete: Restrict)
+  guestSessionId String?
+  staff          Staff?        @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict)
+  staffId        String?
+
+  title String
+  body  String
+
+  // Keep this optionally for arbitrary data in the future, a deep link or a trip id for example.
+  data Json?
+
+  deliveries NotificationDelivery[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, id])
+  @@index([tenantId, customerId])
+  @@index([tenantId, staffId])
+}
+
+model NotificationDelivery {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  notification   Notification @relation(fields: [tenantId, notificationId], references: [tenantId, id])
+  notificationId String
+
+  channel NotificationChannel
+  status  NotificationStatus  @default(PENDING)
+
+  // WhatsApp/email address the delivery went to, null for IN_APP.
+  recipient  String?
+  providerId String? // For matching delivery webhooks back to this row.
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  failedAt      DateTime?
+  failureReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, notificationId])
+  @@index([providerId])
+}

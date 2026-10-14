@@ -1,0 +1,86 @@
+enum StaffStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+// A company's employee, signing in to the dashboard on app.rehletak.com.
+model Staff {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  firstName String
+  lastName  String
+  phone     String?
+  status    StaffStatus @default(ACTIVE)
+
+  // Globally unique: the dashboard is one shared host, so the email alone has to identify which company someone belongs to.
+  email String @unique
+
+  passwordHash String
+  permissions  Json
+
+  // Hash of the single-use token in the latest password reset link. Requesting a new link replaces it, so only the newest one works.
+  passwordResetHash      String?   @unique
+  passwordResetExpiresAt DateTime?
+
+  lastLoginAt DateTime?
+
+  sessions      StaffSession[]
+  invitations   StaffInvitation[]
+  trips         Trip[]
+  events        TripEvent[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+}
+
+model StaffSession {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  staff   Staff  @relation(fields: [tenantId, staffId], references: [tenantId, id])
+  staffId String
+
+  refreshToken String @unique
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ipAddress String?
+  userAgent String?
+
+  @@index([tenantId, staffId])
+}
+
+model StaffInvitation {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  email     String
+  tokenHash String @unique
+
+  // Empty for the first invitation into a new tenant, which a platform admin sends before any staff member exists.
+  invitor   Staff?  @relation(fields: [tenantId, invitorId], references: [tenantId, id], onDelete: Restrict)
+  invitorId String?
+
+  permissions Json?
+
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, email])
+}

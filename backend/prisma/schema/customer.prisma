@@ -1,0 +1,108 @@
+enum CustomerStatus {
+  UNVERIFIED
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum VerificationMethod {
+  WHATSAPP
+  EMAIL
+}
+
+// Someone booking through a company's storefront. Scoped per tenant: the same person booking with two companies
+// is two separate customers, each with their own password.
+model Customer {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  firstName String
+  lastName  String
+  phone     String
+  email     String
+  status    CustomerStatus @default(UNVERIFIED)
+
+  passwordHash String
+
+  // Method tells you which channel it was sent to.
+  verificationHash      String?
+  verificationExpiresAt DateTime?
+  verificationAttempts  Int                 @default(0)
+  verificationMethod    VerificationMethod?
+
+  verifiedVia VerificationMethod?
+  verifiedAt  DateTime?
+
+  // Hash of the single-use token in the latest password reset link. Requesting a new link replaces it, so only the newest one works.
+  passwordResetHash      String?   @unique
+  passwordResetExpiresAt DateTime?
+
+  sessions      CustomerSession[]
+  trips         Trip[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
+  // Platform admins search customers across every tenant, which the tenant-first unique indexes can't serve.
+  @@index([email])
+  @@index([phone])
+}
+
+model CustomerSession {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  customer   Customer @relation(fields: [tenantId, customerId], references: [tenantId, id])
+  customerId String
+
+  refreshToken String @unique
+
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  ipAddress String?
+  userAgent String?
+
+  @@index([tenantId, customerId])
+}
+
+// Booking without an account. Verified by phone OTP only, guests have no email verification path.
+model GuestSession {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  firstName String
+  lastName  String
+  phone     String
+  email     String
+
+  tokenHash String @unique
+
+  verificationHash      String?
+  verificationExpiresAt DateTime?
+  verificationAttempts  Int       @default(0)
+  verifiedAt            DateTime?
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  trips         Trip[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, id])
+  @@index([tenantId, phone])
+}

@@ -1,0 +1,720 @@
+-- CreateEnum
+CREATE TYPE "AdminStatus" AS ENUM ('ACTIVE', 'INACTIVE');
+
+-- CreateEnum
+CREATE TYPE "CustomerStatus" AS ENUM ('UNVERIFIED', 'ACTIVE', 'SUSPENDED', 'DELETED');
+
+-- CreateEnum
+CREATE TYPE "VerificationMethod" AS ENUM ('WHATSAPP', 'EMAIL');
+
+-- CreateEnum
+CREATE TYPE "NotificationChannel" AS ENUM ('WHATSAPP', 'IN_APP', 'EMAIL');
+
+-- CreateEnum
+CREATE TYPE "NotificationStatus" AS ENUM ('PENDING', 'SENT', 'DELIVERED', 'READ', 'FAILED');
+
+-- CreateEnum
+CREATE TYPE "StaffStatus" AS ENUM ('ACTIVE', 'SUSPENDED', 'DELETED');
+
+-- CreateEnum
+CREATE TYPE "TenantStatus" AS ENUM ('ACTIVE', 'SUSPENDED');
+
+-- CreateEnum
+CREATE TYPE "TripSource" AS ENUM ('CUSTOMER', 'STAFF');
+
+-- CreateEnum
+CREATE TYPE "TripStatus" AS ENUM ('PENDING', 'CANCELLED', 'CONFIRMED', 'IN_PROGRESS', 'AWAITING_REPORT', 'COMPLETED');
+
+-- CreateEnum
+CREATE TYPE "CarBody" AS ENUM ('SEDAN', 'SUV', 'MINIVAN', 'VAN');
+
+-- CreateEnum
+CREATE TYPE "ExpenseType" AS ENUM ('INTERCITY_TOLL', 'FUEL', 'CAR_MAINTENANCE', 'DRIVER_FEE', 'OTHER');
+
+-- CreateTable
+CREATE TABLE "Admin" (
+    "id" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "status" "AdminStatus" NOT NULL DEFAULT 'ACTIVE',
+    "passwordHash" TEXT NOT NULL,
+    "totpSecret" TEXT,
+    "totpEnabledAt" TIMESTAMP(3),
+    "totpLastUsedStep" INTEGER,
+    "lastLoginAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Admin_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AdminInvitation" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "invitorId" TEXT,
+    "totpSecret" TEXT,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "acceptedAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AdminInvitation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AdminSession" (
+    "id" TEXT NOT NULL,
+    "refreshToken" TEXT NOT NULL,
+    "adminId" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+
+    CONSTRAINT "AdminSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AuditLog" (
+    "id" TEXT NOT NULL,
+    "adminId" TEXT,
+    "tenantId" TEXT,
+    "action" TEXT NOT NULL,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "before" JSONB,
+    "after" JSONB,
+    "ipAddress" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AuditLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AnalyticsDocument" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "bucket" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "month" INTEGER NOT NULL,
+    "year" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AnalyticsDocument_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Customer" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "status" "CustomerStatus" NOT NULL DEFAULT 'UNVERIFIED',
+    "passwordHash" TEXT NOT NULL,
+    "verificationHash" TEXT,
+    "verificationExpiresAt" TIMESTAMP(3),
+    "verificationAttempts" INTEGER NOT NULL DEFAULT 0,
+    "verificationMethod" "VerificationMethod",
+    "verifiedVia" "VerificationMethod",
+    "verifiedAt" TIMESTAMP(3),
+    "passwordResetHash" TEXT,
+    "passwordResetExpiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Customer_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CustomerSession" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "customerId" TEXT NOT NULL,
+    "refreshToken" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+
+    CONSTRAINT "CustomerSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "GuestSession" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "verificationHash" TEXT,
+    "verificationExpiresAt" TIMESTAMP(3),
+    "verificationAttempts" INTEGER NOT NULL DEFAULT 0,
+    "verifiedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "GuestSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Driver" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "amountOwed" DECIMAL(12,2) NOT NULL,
+    "isExternal" BOOLEAN NOT NULL DEFAULT false,
+    "company" TEXT,
+    "notes" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Driver_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Vehicle" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "make" TEXT NOT NULL,
+    "model" TEXT NOT NULL,
+    "year" INTEGER,
+    "plateNumber" TEXT NOT NULL,
+    "color" TEXT NOT NULL,
+    "isExternal" BOOLEAN NOT NULL DEFAULT false,
+    "office" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Vehicle_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "VehicleImage" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "vehicleId" TEXT NOT NULL,
+    "bucket" TEXT NOT NULL,
+    "key" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "VehicleImage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "customerId" TEXT,
+    "guestSessionId" TEXT,
+    "staffId" TEXT,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "data" JSONB,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NotificationDelivery" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "notificationId" TEXT NOT NULL,
+    "channel" "NotificationChannel" NOT NULL,
+    "status" "NotificationStatus" NOT NULL DEFAULT 'PENDING',
+    "recipient" TEXT,
+    "providerId" TEXT,
+    "sentAt" TIMESTAMP(3),
+    "deliveredAt" TIMESTAMP(3),
+    "readAt" TIMESTAMP(3),
+    "failedAt" TIMESTAMP(3),
+    "failureReason" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "NotificationDelivery_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Staff" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "firstName" TEXT NOT NULL,
+    "lastName" TEXT NOT NULL,
+    "phone" TEXT,
+    "status" "StaffStatus" NOT NULL DEFAULT 'ACTIVE',
+    "email" TEXT NOT NULL,
+    "passwordHash" TEXT NOT NULL,
+    "permissions" JSONB NOT NULL,
+    "passwordResetHash" TEXT,
+    "passwordResetExpiresAt" TIMESTAMP(3),
+    "lastLoginAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Staff_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StaffSession" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "refreshToken" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "revokedAt" TIMESTAMP(3),
+    "ipAddress" TEXT,
+    "userAgent" TEXT,
+
+    CONSTRAINT "StaffSession_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StaffInvitation" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "invitorId" TEXT,
+    "permissions" JSONB,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "acceptedAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "StaffInvitation_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Tenant" (
+    "id" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "status" "TenantStatus" NOT NULL DEFAULT 'ACTIVE',
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Tenant_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TenantKey" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "prefix" TEXT NOT NULL,
+    "keyHash" TEXT NOT NULL,
+    "lastUsedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TenantKey_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripClass" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "nameEn" TEXT NOT NULL,
+    "nameAr" TEXT NOT NULL,
+    "archivedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TripClass_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Trip" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "source" "TripSource" NOT NULL,
+    "status" "TripStatus" NOT NULL DEFAULT 'PENDING',
+    "customerId" TEXT,
+    "guestSessionId" TEXT,
+    "staffId" TEXT,
+    "driverId" TEXT,
+    "vehicleId" TEXT,
+    "classId" TEXT NOT NULL,
+    "classSnapshot" JSONB NOT NULL,
+    "clientName" TEXT NOT NULL,
+    "clientPhone" TEXT NOT NULL,
+    "pickupDate" TIMESTAMP(3) NOT NULL,
+    "smallLuggage" INTEGER NOT NULL,
+    "mediumLuggage" INTEGER NOT NULL,
+    "largeLuggage" INTEGER NOT NULL,
+    "passengers" INTEGER NOT NULL,
+    "car" "CarBody" NOT NULL,
+    "totalPrice" DECIMAL(12,2) NOT NULL,
+    "notes" TEXT,
+    "pickupId" TEXT NOT NULL,
+    "pickupSnapshot" TEXT NOT NULL,
+    "pickupLatitude" DECIMAL(9,6) NOT NULL,
+    "pickupLongitude" DECIMAL(9,6) NOT NULL,
+    "dropoffId" TEXT NOT NULL,
+    "dropoffSnapshot" TEXT NOT NULL,
+    "dropoffLatitude" DECIMAL(9,6) NOT NULL,
+    "dropoffLongitude" DECIMAL(9,6) NOT NULL,
+    "previousTripId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Trip_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripEvent" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "staffId" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TripEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripReport" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "tripId" TEXT NOT NULL,
+    "startedAt" TIMESTAMP(3) NOT NULL,
+    "vehiclePickup" TEXT NOT NULL,
+    "startMileage" INTEGER NOT NULL,
+    "pickupAt" TIMESTAMP(3) NOT NULL,
+    "dropoffAt" TIMESTAMP(3) NOT NULL,
+    "vehicleDropoff" TEXT NOT NULL,
+    "endedAt" TIMESTAMP(3) NOT NULL,
+    "endMileage" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "TripReport_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripStop" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "reportId" TEXT NOT NULL,
+    "locationId" TEXT,
+    "address" TEXT NOT NULL,
+    "latitude" DECIMAL(9,6) NOT NULL,
+    "longitude" DECIMAL(9,6) NOT NULL,
+    "startedAt" TIMESTAMP(3) NOT NULL,
+    "endedAt" TIMESTAMP(3) NOT NULL,
+    "notes" TEXT,
+
+    CONSTRAINT "TripStop_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TripExpense" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "reportId" TEXT NOT NULL,
+    "amount" DECIMAL(12,2) NOT NULL,
+    "type" "ExpenseType" NOT NULL,
+    "notes" TEXT,
+
+    CONSTRAINT "TripExpense_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Admin_email_key" ON "Admin"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AdminInvitation_tokenHash_key" ON "AdminInvitation"("tokenHash");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AdminSession_refreshToken_key" ON "AdminSession"("refreshToken");
+
+-- CreateIndex
+CREATE INDEX "AuditLog_entityType_entityId_idx" ON "AuditLog"("entityType", "entityId");
+
+-- CreateIndex
+CREATE INDEX "AuditLog_tenantId_createdAt_idx" ON "AuditLog"("tenantId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AnalyticsDocument_key_key" ON "AnalyticsDocument"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AnalyticsDocument_tenantId_year_month_key" ON "AnalyticsDocument"("tenantId", "year", "month");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Customer_passwordResetHash_key" ON "Customer"("passwordResetHash");
+
+-- CreateIndex
+CREATE INDEX "Customer_email_idx" ON "Customer"("email");
+
+-- CreateIndex
+CREATE INDEX "Customer_phone_idx" ON "Customer"("phone");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Customer_tenantId_id_key" ON "Customer"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Customer_tenantId_email_key" ON "Customer"("tenantId", "email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Customer_tenantId_phone_key" ON "Customer"("tenantId", "phone");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CustomerSession_refreshToken_key" ON "CustomerSession"("refreshToken");
+
+-- CreateIndex
+CREATE INDEX "CustomerSession_tenantId_customerId_idx" ON "CustomerSession"("tenantId", "customerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "GuestSession_tokenHash_key" ON "GuestSession"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "GuestSession_tenantId_phone_idx" ON "GuestSession"("tenantId", "phone");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "GuestSession_tenantId_id_key" ON "GuestSession"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Driver_tenantId_id_key" ON "Driver"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Driver_tenantId_phone_key" ON "Driver"("tenantId", "phone");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Vehicle_tenantId_id_key" ON "Vehicle"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Vehicle_tenantId_plateNumber_key" ON "Vehicle"("tenantId", "plateNumber");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "VehicleImage_key_key" ON "VehicleImage"("key");
+
+-- CreateIndex
+CREATE INDEX "VehicleImage_tenantId_vehicleId_idx" ON "VehicleImage"("tenantId", "vehicleId");
+
+-- CreateIndex
+CREATE INDEX "Notification_tenantId_customerId_idx" ON "Notification"("tenantId", "customerId");
+
+-- CreateIndex
+CREATE INDEX "Notification_tenantId_staffId_idx" ON "Notification"("tenantId", "staffId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Notification_tenantId_id_key" ON "Notification"("tenantId", "id");
+
+-- CreateIndex
+CREATE INDEX "NotificationDelivery_tenantId_notificationId_idx" ON "NotificationDelivery"("tenantId", "notificationId");
+
+-- CreateIndex
+CREATE INDEX "NotificationDelivery_providerId_idx" ON "NotificationDelivery"("providerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Staff_email_key" ON "Staff"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Staff_passwordResetHash_key" ON "Staff"("passwordResetHash");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Staff_tenantId_id_key" ON "Staff"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StaffSession_refreshToken_key" ON "StaffSession"("refreshToken");
+
+-- CreateIndex
+CREATE INDEX "StaffSession_tenantId_staffId_idx" ON "StaffSession"("tenantId", "staffId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StaffInvitation_tokenHash_key" ON "StaffInvitation"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "StaffInvitation_tenantId_email_idx" ON "StaffInvitation"("tenantId", "email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TenantKey_keyHash_key" ON "TenantKey"("keyHash");
+
+-- CreateIndex
+CREATE INDEX "TenantKey_tenantId_idx" ON "TenantKey"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "TripClass_tenantId_archivedAt_idx" ON "TripClass"("tenantId", "archivedAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TripClass_tenantId_id_key" ON "TripClass"("tenantId", "id");
+
+-- CreateIndex
+CREATE INDEX "Trip_tenantId_status_pickupDate_idx" ON "Trip"("tenantId", "status", "pickupDate");
+
+-- CreateIndex
+CREATE INDEX "Trip_tenantId_customerId_idx" ON "Trip"("tenantId", "customerId");
+
+-- CreateIndex
+CREATE INDEX "Trip_tenantId_driverId_idx" ON "Trip"("tenantId", "driverId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Trip_tenantId_id_key" ON "Trip"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Trip_tenantId_code_key" ON "Trip"("tenantId", "code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Trip_tenantId_previousTripId_key" ON "Trip"("tenantId", "previousTripId");
+
+-- CreateIndex
+CREATE INDEX "TripEvent_tenantId_tripId_idx" ON "TripEvent"("tenantId", "tripId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TripReport_tenantId_id_key" ON "TripReport"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TripReport_tenantId_tripId_key" ON "TripReport"("tenantId", "tripId");
+
+-- CreateIndex
+CREATE INDEX "TripStop_tenantId_reportId_idx" ON "TripStop"("tenantId", "reportId");
+
+-- CreateIndex
+CREATE INDEX "TripExpense_tenantId_reportId_idx" ON "TripExpense"("tenantId", "reportId");
+
+-- AddForeignKey
+ALTER TABLE "AdminInvitation" ADD CONSTRAINT "AdminInvitation_invitorId_fkey" FOREIGN KEY ("invitorId") REFERENCES "Admin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AdminSession" ADD CONSTRAINT "AdminSession_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "Admin"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_adminId_fkey" FOREIGN KEY ("adminId") REFERENCES "Admin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AnalyticsDocument" ADD CONSTRAINT "AnalyticsDocument_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Customer" ADD CONSTRAINT "Customer_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_tenantId_customerId_fkey" FOREIGN KEY ("tenantId", "customerId") REFERENCES "Customer"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "GuestSession" ADD CONSTRAINT "GuestSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Driver" ADD CONSTRAINT "Driver_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Vehicle" ADD CONSTRAINT "Vehicle_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VehicleImage" ADD CONSTRAINT "VehicleImage_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "VehicleImage" ADD CONSTRAINT "VehicleImage_tenantId_vehicleId_fkey" FOREIGN KEY ("tenantId", "vehicleId") REFERENCES "Vehicle"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_customerId_fkey" FOREIGN KEY ("tenantId", "customerId") REFERENCES "Customer"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_guestSessionId_fkey" FOREIGN KEY ("tenantId", "guestSessionId") REFERENCES "GuestSession"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_tenantId_notificationId_fkey" FOREIGN KEY ("tenantId", "notificationId") REFERENCES "Notification"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Staff" ADD CONSTRAINT "Staff_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffInvitation" ADD CONSTRAINT "StaffInvitation_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StaffInvitation" ADD CONSTRAINT "StaffInvitation_tenantId_invitorId_fkey" FOREIGN KEY ("tenantId", "invitorId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TenantKey" ADD CONSTRAINT "TenantKey_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripClass" ADD CONSTRAINT "TripClass_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_customerId_fkey" FOREIGN KEY ("tenantId", "customerId") REFERENCES "Customer"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_guestSessionId_fkey" FOREIGN KEY ("tenantId", "guestSessionId") REFERENCES "GuestSession"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_driverId_fkey" FOREIGN KEY ("tenantId", "driverId") REFERENCES "Driver"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_vehicleId_fkey" FOREIGN KEY ("tenantId", "vehicleId") REFERENCES "Vehicle"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_classId_fkey" FOREIGN KEY ("tenantId", "classId") REFERENCES "TripClass"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_previousTripId_fkey" FOREIGN KEY ("tenantId", "previousTripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_tripId_fkey" FOREIGN KEY ("tenantId", "tripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripReport" ADD CONSTRAINT "TripReport_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripReport" ADD CONSTRAINT "TripReport_tenantId_tripId_fkey" FOREIGN KEY ("tenantId", "tripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripStop" ADD CONSTRAINT "TripStop_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripStop" ADD CONSTRAINT "TripStop_tenantId_reportId_fkey" FOREIGN KEY ("tenantId", "reportId") REFERENCES "TripReport"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripExpense" ADD CONSTRAINT "TripExpense_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TripExpense" ADD CONSTRAINT "TripExpense_tenantId_reportId_fkey" FOREIGN KEY ("tenantId", "reportId") REFERENCES "TripReport"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;

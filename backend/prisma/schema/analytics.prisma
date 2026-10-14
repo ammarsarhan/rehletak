@@ -1,0 +1,15 @@
+model AnalyticsDocument {
+  id String @id @default(cuid())
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  tenantId String
+
+  bucket String
+  key    String @unique
+  month  Int
+  year   Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, year, month])
+}
