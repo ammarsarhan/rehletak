@@ -8,6 +8,9 @@ CREATE TYPE "CustomerStatus" AS ENUM ('UNVERIFIED', 'ACTIVE', 'SUSPENDED', 'DELE
 CREATE TYPE "VerificationMethod" AS ENUM ('WHATSAPP', 'EMAIL');
 
 -- CreateEnum
+CREATE TYPE "Locality" AS ENUM ('GOVERNORATE', 'DISTRICT', 'AREA');
+
+-- CreateEnum
 CREATE TYPE "NotificationChannel" AS ENUM ('WHATSAPP', 'IN_APP', 'EMAIL');
 
 -- CreateEnum
@@ -134,7 +137,6 @@ CREATE TABLE "Customer" (
 -- CreateTable
 CREATE TABLE "CustomerSession" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "customerId" TEXT NOT NULL,
     "refreshToken" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -204,13 +206,26 @@ CREATE TABLE "Vehicle" (
 -- CreateTable
 CREATE TABLE "VehicleImage" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "vehicleId" TEXT NOT NULL,
     "bucket" TEXT NOT NULL,
     "key" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "VehicleImage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Location" (
+    "id" TEXT NOT NULL,
+    "parentId" TEXT,
+    "locality" "Locality" NOT NULL,
+    "nameEn" TEXT NOT NULL,
+    "nameAr" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Location_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -231,7 +246,6 @@ CREATE TABLE "Notification" (
 -- CreateTable
 CREATE TABLE "NotificationDelivery" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "notificationId" TEXT NOT NULL,
     "channel" "NotificationChannel" NOT NULL,
     "status" "NotificationStatus" NOT NULL DEFAULT 'PENDING',
@@ -246,6 +260,21 @@ CREATE TABLE "NotificationDelivery" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "NotificationDelivery_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Pricing" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "fromId" TEXT NOT NULL,
+    "toId" TEXT NOT NULL,
+    "classId" TEXT NOT NULL,
+    "car" "CarBody" NOT NULL,
+    "price" DECIMAL(12,2) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Pricing_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -271,7 +300,6 @@ CREATE TABLE "Staff" (
 -- CreateTable
 CREATE TABLE "StaffSession" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "staffId" TEXT NOT NULL,
     "refreshToken" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -381,7 +409,6 @@ CREATE TABLE "Trip" (
 -- CreateTable
 CREATE TABLE "TripEvent" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "staffId" TEXT NOT NULL,
     "tripId" TEXT NOT NULL,
     "action" TEXT NOT NULL,
@@ -393,7 +420,6 @@ CREATE TABLE "TripEvent" (
 -- CreateTable
 CREATE TABLE "TripReport" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "tripId" TEXT NOT NULL,
     "startedAt" TIMESTAMP(3) NOT NULL,
     "vehiclePickup" TEXT NOT NULL,
@@ -412,7 +438,6 @@ CREATE TABLE "TripReport" (
 -- CreateTable
 CREATE TABLE "TripStop" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "reportId" TEXT NOT NULL,
     "locationId" TEXT,
     "address" TEXT NOT NULL,
@@ -428,7 +453,6 @@ CREATE TABLE "TripStop" (
 -- CreateTable
 CREATE TABLE "TripExpense" (
     "id" TEXT NOT NULL,
-    "tenantId" TEXT NOT NULL,
     "reportId" TEXT NOT NULL,
     "amount" DECIMAL(12,2) NOT NULL,
     "type" "ExpenseType" NOT NULL,
@@ -480,7 +504,7 @@ CREATE UNIQUE INDEX "Customer_tenantId_phone_key" ON "Customer"("tenantId", "pho
 CREATE UNIQUE INDEX "CustomerSession_refreshToken_key" ON "CustomerSession"("refreshToken");
 
 -- CreateIndex
-CREATE INDEX "CustomerSession_tenantId_customerId_idx" ON "CustomerSession"("tenantId", "customerId");
+CREATE INDEX "CustomerSession_customerId_idx" ON "CustomerSession"("customerId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "GuestSession_tokenHash_key" ON "GuestSession"("tokenHash");
@@ -507,7 +531,10 @@ CREATE UNIQUE INDEX "Vehicle_tenantId_plateNumber_key" ON "Vehicle"("tenantId", 
 CREATE UNIQUE INDEX "VehicleImage_key_key" ON "VehicleImage"("key");
 
 -- CreateIndex
-CREATE INDEX "VehicleImage_tenantId_vehicleId_idx" ON "VehicleImage"("tenantId", "vehicleId");
+CREATE INDEX "VehicleImage_vehicleId_idx" ON "VehicleImage"("vehicleId");
+
+-- CreateIndex
+CREATE INDEX "Location_parentId_idx" ON "Location"("parentId");
 
 -- CreateIndex
 CREATE INDEX "Notification_tenantId_customerId_idx" ON "Notification"("tenantId", "customerId");
@@ -519,10 +546,16 @@ CREATE INDEX "Notification_tenantId_staffId_idx" ON "Notification"("tenantId", "
 CREATE UNIQUE INDEX "Notification_tenantId_id_key" ON "Notification"("tenantId", "id");
 
 -- CreateIndex
-CREATE INDEX "NotificationDelivery_tenantId_notificationId_idx" ON "NotificationDelivery"("tenantId", "notificationId");
+CREATE INDEX "NotificationDelivery_notificationId_idx" ON "NotificationDelivery"("notificationId");
 
 -- CreateIndex
 CREATE INDEX "NotificationDelivery_providerId_idx" ON "NotificationDelivery"("providerId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Pricing_tenantId_id_key" ON "Pricing"("tenantId", "id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Pricing_tenantId_fromId_toId_classId_car_key" ON "Pricing"("tenantId", "fromId", "toId", "classId", "car");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Staff_email_key" ON "Staff"("email");
@@ -537,7 +570,7 @@ CREATE UNIQUE INDEX "Staff_tenantId_id_key" ON "Staff"("tenantId", "id");
 CREATE UNIQUE INDEX "StaffSession_refreshToken_key" ON "StaffSession"("refreshToken");
 
 -- CreateIndex
-CREATE INDEX "StaffSession_tenantId_staffId_idx" ON "StaffSession"("tenantId", "staffId");
+CREATE INDEX "StaffSession_staffId_idx" ON "StaffSession"("staffId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StaffInvitation_tokenHash_key" ON "StaffInvitation"("tokenHash");
@@ -579,19 +612,16 @@ CREATE UNIQUE INDEX "Trip_tenantId_code_key" ON "Trip"("tenantId", "code");
 CREATE UNIQUE INDEX "Trip_tenantId_previousTripId_key" ON "Trip"("tenantId", "previousTripId");
 
 -- CreateIndex
-CREATE INDEX "TripEvent_tenantId_tripId_idx" ON "TripEvent"("tenantId", "tripId");
+CREATE INDEX "TripEvent_tripId_idx" ON "TripEvent"("tripId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "TripReport_tenantId_id_key" ON "TripReport"("tenantId", "id");
+CREATE UNIQUE INDEX "TripReport_tripId_key" ON "TripReport"("tripId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "TripReport_tenantId_tripId_key" ON "TripReport"("tenantId", "tripId");
+CREATE INDEX "TripStop_reportId_idx" ON "TripStop"("reportId");
 
 -- CreateIndex
-CREATE INDEX "TripStop_tenantId_reportId_idx" ON "TripStop"("tenantId", "reportId");
-
--- CreateIndex
-CREATE INDEX "TripExpense_tenantId_reportId_idx" ON "TripExpense"("tenantId", "reportId");
+CREATE INDEX "TripExpense_reportId_idx" ON "TripExpense"("reportId");
 
 -- AddForeignKey
 ALTER TABLE "AdminInvitation" ADD CONSTRAINT "AdminInvitation_invitorId_fkey" FOREIGN KEY ("invitorId") REFERENCES "Admin"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -609,10 +639,7 @@ ALTER TABLE "AnalyticsDocument" ADD CONSTRAINT "AnalyticsDocument_tenantId_fkey"
 ALTER TABLE "Customer" ADD CONSTRAINT "Customer_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_tenantId_customerId_fkey" FOREIGN KEY ("tenantId", "customerId") REFERENCES "Customer"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "CustomerSession" ADD CONSTRAINT "CustomerSession_customerId_fkey" FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "GuestSession" ADD CONSTRAINT "GuestSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -624,10 +651,10 @@ ALTER TABLE "Driver" ADD CONSTRAINT "Driver_tenantId_fkey" FOREIGN KEY ("tenantI
 ALTER TABLE "Vehicle" ADD CONSTRAINT "Vehicle_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VehicleImage" ADD CONSTRAINT "VehicleImage_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "VehicleImage" ADD CONSTRAINT "VehicleImage_vehicleId_fkey" FOREIGN KEY ("vehicleId") REFERENCES "Vehicle"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "VehicleImage" ADD CONSTRAINT "VehicleImage_tenantId_vehicleId_fkey" FOREIGN KEY ("tenantId", "vehicleId") REFERENCES "Vehicle"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Location" ADD CONSTRAINT "Location_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Location"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -642,19 +669,25 @@ ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_guestSessionId_
 ALTER TABLE "Notification" ADD CONSTRAINT "Notification_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_notificationId_fkey" FOREIGN KEY ("notificationId") REFERENCES "Notification"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "NotificationDelivery" ADD CONSTRAINT "NotificationDelivery_tenantId_notificationId_fkey" FOREIGN KEY ("tenantId", "notificationId") REFERENCES "Notification"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Pricing" ADD CONSTRAINT "Pricing_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Pricing" ADD CONSTRAINT "Pricing_fromId_fkey" FOREIGN KEY ("fromId") REFERENCES "Location"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Pricing" ADD CONSTRAINT "Pricing_toId_fkey" FOREIGN KEY ("toId") REFERENCES "Location"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Pricing" ADD CONSTRAINT "Pricing_tenantId_classId_fkey" FOREIGN KEY ("tenantId", "classId") REFERENCES "TripClass"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Staff" ADD CONSTRAINT "Staff_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "StaffSession" ADD CONSTRAINT "StaffSession_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "Staff"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StaffInvitation" ADD CONSTRAINT "StaffInvitation_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -690,31 +723,26 @@ ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_vehicleId_fkey" FOREIGN KEY ("t
 ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_classId_fkey" FOREIGN KEY ("tenantId", "classId") REFERENCES "TripClass"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_pickupId_fkey" FOREIGN KEY ("pickupId") REFERENCES "Location"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Trip" ADD CONSTRAINT "Trip_dropoffId_fkey" FOREIGN KEY ("dropoffId") REFERENCES "Location"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Trip" ADD CONSTRAINT "Trip_tenantId_previousTripId_fkey" FOREIGN KEY ("tenantId", "previousTripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_staffId_fkey" FOREIGN KEY ("staffId") REFERENCES "Staff"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_staffId_fkey" FOREIGN KEY ("tenantId", "staffId") REFERENCES "Staff"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TripEvent" ADD CONSTRAINT "TripEvent_tenantId_tripId_fkey" FOREIGN KEY ("tenantId", "tripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TripReport" ADD CONSTRAINT "TripReport_tripId_fkey" FOREIGN KEY ("tripId") REFERENCES "Trip"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TripReport" ADD CONSTRAINT "TripReport_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TripStop" ADD CONSTRAINT "TripStop_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "TripReport"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "TripReport" ADD CONSTRAINT "TripReport_tenantId_tripId_fkey" FOREIGN KEY ("tenantId", "tripId") REFERENCES "Trip"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "TripExpense" ADD CONSTRAINT "TripExpense_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "TripReport"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
--- AddForeignKey
-ALTER TABLE "TripStop" ADD CONSTRAINT "TripStop_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "TripStop" ADD CONSTRAINT "TripStop_tenantId_reportId_fkey" FOREIGN KEY ("tenantId", "reportId") REFERENCES "TripReport"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "TripExpense" ADD CONSTRAINT "TripExpense_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "TripExpense" ADD CONSTRAINT "TripExpense_tenantId_reportId_fkey" FOREIGN KEY ("tenantId", "reportId") REFERENCES "TripReport"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;

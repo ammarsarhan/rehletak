@@ -52,10 +52,7 @@ model Vehicle {
 model VehicleImage {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  vehicle   Vehicle @relation(fields: [tenantId, vehicleId], references: [tenantId, id])
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
   vehicleId String
 
   // Globally unique: one bucket is shared by every tenant, keys are prefixed with the tenant's slug.
@@ -64,5 +61,5 @@ model VehicleImage {
 
   createdAt DateTime @default(now())
 
-  @@index([tenantId, vehicleId])
+  @@index([vehicleId])
 }
