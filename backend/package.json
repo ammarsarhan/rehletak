@@ -16,18 +16,22 @@
     "generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:status": "prisma migrate status"
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
     "@hono/zod-validator": "^0.9.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "argon2": "^0.45.1",
     "bullmq": "^6.3.14",
     "dotenv": "^17.4.2",
     "hono": "catalog:",
     "ioredis": "^6.0.0",
+    "otpauth": "^9.5.2",
     "pg": "^8.23.0",
+    "resend": "^6.30.0",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -154,3 +154,6 @@ generated/
 .vercel
 .env*
 !.env.example
+
+# Local https certificates (mkcert)
+.certs

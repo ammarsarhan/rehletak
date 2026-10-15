@@ -2,23 +2,25 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
 
 import AppError from "./shared/utils/error.js";
+import { requestLogger } from "./shared/middleware/logger.js";
+import { requireOrigin } from "./shared/middleware/origin.js";
 
 import health from "./domains/health/health.routes.js";
+import admin from "./domains/admin/admin.routes.js";
+
+// The staff and admin dashboards of this environment, the only browser origins allowed to call the API with cookies.
+const origins = (process.env.CORS_ORIGINS ?? "").split(",").map(o => o.trim()).filter(Boolean);
 
 const app = new Hono()
-  .use("*", logger())
+  .use("*", requestLogger())
   .use("*", secureHeaders())
-  // Only the staff and admin dashboards of this environment may call the API from a browser with cookies.
-  .use("*", cors({
-    origin: (process.env.CORS_ORIGINS ?? "").split(",").map(o => o.trim()).filter(Boolean),
-    credentials: true,
-  }))
+  .use("*", cors({ origin: origins, credentials: true }))
+  .use("*", requireOrigin(origins))
   .onError((err, c) => {
     // Handle the AppErrors we throw throughout the application's logic.
     if (err instanceof AppError) {
@@ -66,7 +68,8 @@ const app = new Hono()
       },
     }, 500);
   })
-  .route("/health", health);
+  .route("/health", health)
+  .route("/admin", admin);
 
 export type AppType = typeof app;
 export default app;
