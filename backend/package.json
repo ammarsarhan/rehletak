@@ -28,6 +28,7 @@
     "dotenv": "^17.4.2",
     "hono": "catalog:",
     "ioredis": "^6.0.0",
+    "otpauth": "^9.5.2",
     "pg": "^8.23.0",
     "resend": "^6.30.0",
     "zod": "catalog:"

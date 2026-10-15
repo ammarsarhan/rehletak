@@ -1,5 +1,7 @@
 import { prisma } from "../../shared/utils/prisma.js";
 import { generateToken, hashToken } from "../../shared/utils/token.js";
+import { decrypt, encrypt } from "../../shared/utils/encryption.js";
+import { createTotpSecret, getTotpUri } from "../../shared/utils/totp.js";
 import { BadRequestError, ConflictError, ERROR_CODES, ServiceUnavailableError } from "../../shared/utils/error.js";
 import MessagingService from "../messaging/messaging.service.js";
 import AuditService, { AUDIT_ACTIONS } from "../audit/audit.service.js";
@@ -95,5 +97,37 @@ export default class AdminService {
     getInvitation = async (token: string) => {
         const { email, expiresAt } = await this.findUsableInvitation(token);
         return { email, expiresAt };
+    }
+
+    // Gives the invitee a two-factor secret to add to their authenticator app. The same secret comes back if they ask again
+    // (e.g. after a refresh), so a code from an app they already set up keeps working. Only a new secret is recorded.
+    startTotpSetup = async (token: string, ipAddress: string | null) => {
+        const invitation = await this.findUsableInvitation(token);
+
+        if (invitation.totpSecret) {
+            const secret = decrypt(invitation.totpSecret);
+            return { uri: getTotpUri(secret, invitation.email), secret };
+        }
+
+        const secret = createTotpSecret();
+
+        await prisma.$transaction(async (tx) => {
+            // Only fills an empty slot, so two requests at once can't hand out two different secrets.
+            const { count } = await tx.adminInvitation.updateMany({
+                where: { id: invitation.id, totpSecret: null, acceptedAt: null, revokedAt: null },
+                data: { totpSecret: encrypt(secret) },
+            });
+
+            if (count === 0) return;
+
+            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.INVITATION_TOTP_ISSUED, entityType: "AdminInvitation", entityId: invitation.id, ipAddress }, tx);
+        });
+
+        // Whichever secret was stored is the one that counts, even if another request stored it first.
+        const stored = await prisma.adminInvitation.findUniqueOrThrow({ where: { id: invitation.id }, select: { totpSecret: true } });
+        if (!stored.totpSecret) throw new BadRequestError("This invitation link is invalid or has already been used.", ERROR_CODES.INVITATION_INVALID);
+
+        const current = decrypt(stored.totpSecret);
+        return { uri: getTotpUri(current, invitation.email), secret: current };
     }
 }

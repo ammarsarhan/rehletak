@@ -6,6 +6,7 @@ import type { Prisma } from "../../../generated/prisma/client.js";
 export const AUDIT_ACTIONS = {
     INVITATION_SENT: "admin.invitation.sent",
     INVITATION_REVOKED: "admin.invitation.revoked",
+    INVITATION_TOTP_ISSUED: "admin.invitation.totp_issued",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
