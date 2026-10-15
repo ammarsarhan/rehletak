@@ -76,6 +76,15 @@ export default defineRailway((ctx) => {
               CORS_ORIGINS: production
                 ? "https://dashboard.rehletak.app,https://admin.rehletak.app"
                 : "https://dashboard.staging.rehletak.app,https://admin.staging.rehletak.app",
+              // Where admin invitation links point.
+              ADMIN_URL: production ? "https://admin.rehletak.app" : "https://admin.staging.rehletak.app",
+              RESEND_EMAIL: "Rehletak <no-reply@rehletak.app>",
+              // Secrets: never set from here, since an apply would write them empty. Each environment needs them set
+              // once by hand (its own values), after which they're kept as is. Changing TOTP_ENCRYPTION_KEY breaks
+              // every admin's authenticator setup; changing ADMIN_SECRET signs every admin out.
+              ADMIN_SECRET: preserve(),
+              TOTP_ENCRYPTION_KEY: preserve(),
+              RESEND_KEY: preserve(),
             }
           : {}),
       },
