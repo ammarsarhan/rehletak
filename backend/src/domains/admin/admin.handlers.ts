@@ -1,6 +1,7 @@
 import { createFactory } from "hono/factory";
 import type { Context } from "hono";
-import AdminService from "./admin.service.js";
+import AdminService, { createAdminResponse } from "./admin.service.js";
+import { authorizeAdmin } from "./admin.middleware.js";
 import TokenService from "../token/token.service.js";
 import { acceptAdminInvitationSchema, adminInvitationTokenSchema, adminSignInSchema, adminVerifySchema } from "./admin.validators.js";
 import { ForbiddenError, UnauthorizedError } from "../../shared/utils/error.js";
@@ -118,5 +119,13 @@ export const adminSignOutHandler = factory.createHandlers(
 
         TokenService.clearAuthenticationCookies(c, "admin");
         return c.json({ success: true }, 200);
+    }
+)
+
+// The guard has already loaded the admin and checked they're active.
+export const adminSessionHandler = factory.createHandlers(
+    authorizeAdmin(),
+    async (c) => {
+        return c.json({ success: true, data: { admin: createAdminResponse(c.var.admin) } }, 200);
     }
 )
