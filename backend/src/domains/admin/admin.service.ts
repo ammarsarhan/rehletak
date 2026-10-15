@@ -36,7 +36,7 @@ export default class AdminService {
         if (url) return url;
 
         if (process.env.NODE_ENV === "production") throw new Error("ADMIN_URL is not defined. Please define it in the environment variables.");
-        return "http://admin.localhost:3000";
+        return "https://admin.local.rehletak.app:3000";
     }
 
     // Invites the very first admin. Only works while there are no admins at all: after that, every admin is invited by

@@ -2,7 +2,7 @@
   "name": "@rehletak/dashboard",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --experimental-https --experimental-https-key ../.certs/local-key.pem --experimental-https-cert ../.certs/local.pem",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

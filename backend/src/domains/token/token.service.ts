@@ -38,10 +38,11 @@ const config = {
 export default class TokenService {
     // The dashboards and the API are subdomains of the same site (admin.rehletak.app and api.rehletak.app), so Lax cookies
     // reach the API on the dashboards' fetches while staying off requests started by other sites. The cookies are host-only
-    // on the API, so other subdomains never receive them. Secure needs https, so local development over http drops it.
+    // on the API, so other subdomains never receive them. Always Secure: local development runs on https too
+    // (*.local.rehletak.app), so it behaves exactly like production.
     private static readonly baseCookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: true,
         sameSite: "Lax",
     } as const;
 
