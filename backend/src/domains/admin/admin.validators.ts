@@ -49,3 +49,7 @@ export const adminSignInSchema = z.object({
     email: emailSchema,
     password: z.string({ error: "Password is required." }).min(1, "Password is required."),
 });
+
+export const adminVerifySchema = z.object({
+    code: codeSchema,
+});

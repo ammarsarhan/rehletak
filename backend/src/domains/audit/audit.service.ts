@@ -12,6 +12,7 @@ export const AUDIT_ACTIONS = {
     TOTP_ENABLED: "admin.totp.enabled",
     SIGN_IN_PASSWORD_FAILED: "admin.sign_in.password_failed",
     SIGN_IN_PASSWORD_PASSED: "admin.sign_in.password_passed",
+    SIGN_IN_TOTP_FAILED: "admin.sign_in.totp_failed",
     SIGN_IN_BLOCKED: "admin.sign_in.blocked",
     SIGN_IN_SUCCEEDED: "admin.sign_in.succeeded",
     SESSION_REVOKED: "admin.session.revoked",

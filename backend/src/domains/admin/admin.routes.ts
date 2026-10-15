@@ -3,6 +3,7 @@ import {
     acceptAdminInvitationHandler,
     adminInvitationTotpHandler,
     adminSignInHandler,
+    adminVerifyHandler,
     lookupAdminInvitationHandler,
 } from "./admin.handlers.js";
 
@@ -12,5 +13,6 @@ const admin = new Hono()
     .post("/invitations/totp", ...adminInvitationTotpHandler)
     .post("/invitations/accept", ...acceptAdminInvitationHandler)
     .post("/auth/sign-in", ...adminSignInHandler)
+    .post("/auth/verify", ...adminVerifyHandler)
 
 export default admin;

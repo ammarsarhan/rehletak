@@ -20,6 +20,7 @@ export const ERROR_CODES = {
   // Two-factor
   TOTP_SETUP_REQUIRED: "TOTP_SETUP_REQUIRED",
   TOTP_CODE_INVALID: "TOTP_CODE_INVALID",
+  TOTP_CHALLENGE_INVALID: "TOTP_CHALLENGE_INVALID",
 } as const;
 
 export type ErrorCode =

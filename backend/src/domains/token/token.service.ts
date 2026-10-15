@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
-import { decode, sign, verify } from "hono/jwt";
+import { sign, verify } from "hono/jwt";
 
 // Who a token was issued to. Each audience has its own secret and cookies, so a token from one can never be used as another.
 // Staff join as a second audience once their auth is built.
@@ -146,19 +146,6 @@ export default class TokenService {
             return typeof payload.sub === "string" ? payload.sub : null;
         } catch {
             return null;
-        }
-    }
-
-    // Reads the challenge's admin id without checking the signature. Only for keying rate limits, never for access.
-    static peekChallengeCookie = (c: Context) => {
-        const token = getCookie(c, this.CHALLENGE_COOKIE);
-        if (!token) return undefined;
-
-        try {
-            const { sub } = decode(token).payload;
-            return typeof sub === "string" ? sub : undefined;
-        } catch {
-            return undefined;
         }
     }
 

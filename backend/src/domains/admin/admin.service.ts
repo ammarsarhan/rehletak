@@ -281,4 +281,39 @@ export default class AdminService {
 
         return admin;
     }
+
+    // The second half of signing in: checks the two-factor code for the admin who passed the password check.
+    verifySignIn = async (adminId: string | null, code: string, ipAddress: string | null) => {
+        if (!adminId) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", ERROR_CODES.TOTP_CHALLENGE_INVALID);
+
+        const admin = await prisma.admin.findUnique({ where: { id: adminId } });
+
+        if (!admin?.totpSecret) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", ERROR_CODES.TOTP_CHALLENGE_INVALID);
+        if (admin.status !== AdminStatus.ACTIVE) {
+            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
+            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+        }
+
+        // A wrong code after a correct password is worth recording: it can mean someone has the password but not the phone.
+        const fail = async (reason: "wrong_code" | "code_reused") => {
+            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_TOTP_FAILED, entityType: "Admin", entityId: admin.id, after: { reason }, ipAddress });
+            return new BadRequestError("That code didn't work. Check your authenticator app and try again.", ERROR_CODES.TOTP_CODE_INVALID);
+        };
+
+        const secret = decrypt(admin.totpSecret);
+        const step = verifyTotp(secret, code, admin.totpLastUsedStep);
+
+        // Checked again without the last used step, to tell a wrong code apart from a correct one being reused.
+        if (step === null) throw await fail(verifyTotp(secret, code, null) === null ? "wrong_code" : "code_reused");
+
+        // Record the step in the same statement that checks it, so two requests can't both use the same code.
+        const { count } = await prisma.admin.updateMany({
+            where: { id: admin.id, OR: [{ totpLastUsedStep: null }, { totpLastUsedStep: { lt: step } }] },
+            data: { totpLastUsedStep: step, lastLoginAt: new Date() },
+        });
+
+        if (count === 0) throw await fail("code_reused");
+
+        return admin;
+    }
 }
