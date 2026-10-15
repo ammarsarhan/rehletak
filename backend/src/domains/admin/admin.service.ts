@@ -1,16 +1,33 @@
 import { prisma } from "../../shared/utils/prisma.js";
 import { generateToken, hashToken } from "../../shared/utils/token.js";
 import { decrypt, encrypt } from "../../shared/utils/encryption.js";
-import { createTotpSecret, getTotpUri } from "../../shared/utils/totp.js";
+import { createTotpSecret, getTotpUri, verifyTotp } from "../../shared/utils/totp.js";
+import { hash } from "../../shared/utils/hash.js";
 import { BadRequestError, ConflictError, ERROR_CODES, ServiceUnavailableError } from "../../shared/utils/error.js";
 import MessagingService from "../messaging/messaging.service.js";
+import TokenService from "../token/token.service.js";
 import AuditService, { AUDIT_ACTIONS } from "../audit/audit.service.js";
+import type { Admin } from "../../../generated/prisma/client.js";
+import type { AcceptAdminInvitationPayload } from "./admin.validators.js";
+
+type RequestInfo = { ipAddress: string | null; userAgent: string | null };
+
+export const createAdminResponse = (admin: Admin) => ({
+    id: admin.id,
+    firstName: admin.firstName,
+    lastName: admin.lastName,
+    email: admin.email,
+    status: admin.status,
+});
 
 export default class AdminService {
     private readonly messagingService = new MessagingService();
 
     // Shorter than staff invitations, since an admin account has more power.
     private readonly INVITATION_LIFETIME = 48 * 60 * 60 * 1000;
+    private readonly MAXIMUM_SESSION_LIMIT = 3;
+    // Admin sessions end 12 hours after signing in no matter how often they refresh, so a stolen session can't live on.
+    private readonly SESSION_ABSOLUTE_LIFETIME = 12 * 60 * 60 * 1000;
 
     // Where invitation links point. Required in production, so a link can never point at localhost.
     private getAdminUrl = () => {
@@ -129,5 +146,107 @@ export default class AdminService {
 
         const current = decrypt(stored.totpSecret);
         return { uri: getTotpUri(current, invitation.email), secret: current };
+    }
+
+    // Creates the admin account once they've proven their authenticator app works. The invitation is claimed in the same
+    // transaction that creates the account, so a link can't be used twice even by two requests at once.
+    acceptInvitation = async ({ token, code, password, ...details }: AcceptAdminInvitationPayload, ipAddress: string | null) => {
+        const invitation = await this.findUsableInvitation(token);
+
+        if (!invitation.totpSecret) throw new BadRequestError("Set up two-factor authentication before creating your account.", ERROR_CODES.TOTP_SETUP_REQUIRED);
+
+        const step = verifyTotp(decrypt(invitation.totpSecret), code, null);
+
+        if (step === null) {
+            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.INVITATION_ACCEPT_FAILED, entityType: "AdminInvitation", entityId: invitation.id, after: { reason: "wrong_code" }, ipAddress });
+            throw new BadRequestError("That code didn't work. Check your authenticator app and try again.", ERROR_CODES.TOTP_CODE_INVALID);
+        }
+
+        const existing = await prisma.admin.findUnique({ where: { email: invitation.email }, select: { id: true } });
+        if (existing) throw new ConflictError("An admin account with this email already exists.", ERROR_CODES.ACCOUNT_ALREADY_EXISTS);
+
+        const passwordHash = await hash(password);
+        const now = new Date();
+
+        return prisma.$transaction(async (tx) => {
+            // Matching the secret too means a secret swapped in by another request can't be used with this code.
+            const { count } = await tx.adminInvitation.updateMany({
+                where: { id: invitation.id, totpSecret: invitation.totpSecret, acceptedAt: null, revokedAt: null, expiresAt: { gt: now } },
+                data: { acceptedAt: now, totpSecret: null },
+            });
+
+            if (count === 0) throw new BadRequestError("This invitation link is invalid or has already been used.", ERROR_CODES.INVITATION_INVALID);
+
+            const created = await tx.admin.create({
+                data: {
+                    ...details,
+                    email: invitation.email,
+                    passwordHash,
+                    totpSecret: invitation.totpSecret,
+                    totpEnabledAt: now,
+                    // The code used to confirm setup can't be reused to sign in.
+                    totpLastUsedStep: step,
+                    lastLoginAt: now,
+                },
+            });
+
+            // Recorded in the same transaction, so an admin can't exist without a record of how they got in.
+            await AuditService.record({
+                adminId: created.id,
+                action: AUDIT_ACTIONS.INVITATION_ACCEPTED,
+                entityType: "AdminInvitation",
+                entityId: invitation.id,
+                after: { adminId: created.id, email: created.email, invitedBy: invitation.invitorId },
+                ipAddress,
+            }, tx);
+
+            await AuditService.record({ adminId: created.id, action: AUDIT_ACTIONS.TOTP_ENABLED, entityType: "Admin", entityId: created.id, ipAddress }, tx);
+
+            return created;
+        });
+    }
+
+    // Starts a session for an admin who has fully signed in, keeping at most a few active at once.
+    // `via` records how they got here: a new account from an invitation, or password plus two-factor code.
+    createSession = async (admin: Admin, via: "invitation" | "password_and_totp", { ipAddress, userAgent }: RequestInfo) => {
+        const { accessToken, refreshToken, refreshTokenHash, expiresAt: slidingExpiresAt } = await TokenService.generateTokenPair("admin", admin.id, {});
+        const expiresAt = new Date(Math.min(slidingExpiresAt.getTime(), Date.now() + this.SESSION_ABSOLUTE_LIFETIME));
+
+        await prisma.$transaction(async (tx) => {
+            const activeSessions = await tx.adminSession.findMany({
+                where: { adminId: admin.id, revokedAt: null, expiresAt: { gt: new Date() } },
+                orderBy: { createdAt: "asc" },
+                select: { id: true },
+            });
+
+            // Revoke the oldest sessions to make way for the new one.
+            const sessionsToRevoke = activeSessions.slice(0, Math.max(0, activeSessions.length - this.MAXIMUM_SESSION_LIMIT + 1));
+
+            if (sessionsToRevoke.length > 0) {
+                await tx.adminSession.updateMany({
+                    where: { id: { in: sessionsToRevoke.map((session) => session.id) } },
+                    data: { revokedAt: new Date() },
+                });
+
+                for (const { id } of sessionsToRevoke) {
+                    await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SESSION_REVOKED, entityType: "AdminSession", entityId: id, after: { reason: "session_limit" }, ipAddress }, tx);
+                }
+            }
+
+            const session = await tx.adminSession.create({
+                data: { adminId: admin.id, refreshToken: refreshTokenHash, expiresAt, ipAddress, userAgent },
+            });
+
+            await AuditService.record({
+                adminId: admin.id,
+                action: AUDIT_ACTIONS.SIGN_IN_SUCCEEDED,
+                entityType: "AdminSession",
+                entityId: session.id,
+                after: { via, userAgent, expiresAt: expiresAt.toISOString() },
+                ipAddress,
+            }, tx);
+        });
+
+        return { admin: createAdminResponse(admin), accessToken, refreshToken, expiresAt };
     }
 }

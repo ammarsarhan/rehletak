@@ -1,7 +1,8 @@
 import { createFactory } from "hono/factory";
 import type { Context } from "hono";
 import AdminService from "./admin.service.js";
-import { adminInvitationTokenSchema } from "./admin.validators.js";
+import TokenService from "../token/token.service.js";
+import { acceptAdminInvitationSchema, adminInvitationTokenSchema } from "./admin.validators.js";
 import validate from "../../shared/middleware/validate.js";
 import { getClientIp, ipKey, rateLimit } from "../../shared/middleware/rateLimit.js";
 
@@ -34,5 +35,19 @@ export const adminInvitationTotpHandler = factory.createHandlers(
         const totp = await adminService.startTotpSetup(token, getRequestInfo(c).ipAddress);
 
         return c.json({ success: true, data: { totp } }, 200);
+    }
+)
+
+// Creates the account and signs the new admin in, since they've just proven both their password and their authenticator.
+export const acceptAdminInvitationHandler = factory.createHandlers(
+    rateLimit({ limit: 10, windowMs: 60 * 60 * 1000, key: ipKey("admin:invitation:accept") }),
+    validate("json", acceptAdminInvitationSchema),
+    async (c) => {
+        const request = getRequestInfo(c);
+        const created = await adminService.acceptInvitation(c.req.valid("json"), request.ipAddress);
+        const { admin, ...tokens } = await adminService.createSession(created, "invitation", request);
+
+        TokenService.setAuthenticationCookies(c, "admin", tokens);
+        return c.json({ success: true, data: { admin } }, 201);
     }
 )

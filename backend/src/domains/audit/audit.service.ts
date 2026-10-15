@@ -7,6 +7,11 @@ export const AUDIT_ACTIONS = {
     INVITATION_SENT: "admin.invitation.sent",
     INVITATION_REVOKED: "admin.invitation.revoked",
     INVITATION_TOTP_ISSUED: "admin.invitation.totp_issued",
+    INVITATION_ACCEPT_FAILED: "admin.invitation.accept_failed",
+    INVITATION_ACCEPTED: "admin.invitation.accepted",
+    TOTP_ENABLED: "admin.totp.enabled",
+    SIGN_IN_SUCCEEDED: "admin.sign_in.succeeded",
+    SESSION_REVOKED: "admin.session.revoked",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
