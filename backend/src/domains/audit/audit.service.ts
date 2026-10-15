@@ -16,6 +16,7 @@ export const AUDIT_ACTIONS = {
     SIGN_IN_BLOCKED: "admin.sign_in.blocked",
     SIGN_IN_SUCCEEDED: "admin.sign_in.succeeded",
     SESSION_REVOKED: "admin.session.revoked",
+    SIGN_OUT: "admin.sign_out",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

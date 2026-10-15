@@ -111,3 +111,12 @@ export const adminRefreshHandler = factory.createHandlers(
         }
     }
 )
+
+export const adminSignOutHandler = factory.createHandlers(
+    async (c) => {
+        await adminService.signOut(TokenService.getRefreshToken(c, "admin"), getRequestInfo(c).ipAddress);
+
+        TokenService.clearAuthenticationCookies(c, "admin");
+        return c.json({ success: true }, 200);
+    }
+)

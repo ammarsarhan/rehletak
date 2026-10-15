@@ -358,4 +358,18 @@ export default class AdminService {
 
         return { admin: createAdminResponse(session.admin), accessToken, refreshToken: newRefreshToken, expiresAt };
     }
+
+    // Revokes the session behind this refresh token. Signing out always succeeds, even when the session is already gone.
+    signOut = async (refreshToken: string | undefined, ipAddress: string | null) => {
+        if (!refreshToken) return;
+
+        const session = await prisma.adminSession.findUnique({ where: { refreshToken: TokenService.hashRefreshToken(refreshToken) } });
+        if (!session || session.revokedAt) return;
+
+        // Only recorded when this request is the one that ended the session.
+        await prisma.$transaction(async (tx) => {
+            const { count } = await tx.adminSession.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: new Date() } });
+            if (count > 0) await AuditService.record({ adminId: session.adminId, action: AUDIT_ACTIONS.SIGN_OUT, entityType: "AdminSession", entityId: session.id, ipAddress }, tx);
+        });
+    }
 }
