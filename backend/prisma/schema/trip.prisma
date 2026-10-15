@@ -28,7 +28,7 @@ enum ExpenseType {
   OTHER
 }
 
-// A tenant's own trip classes, e.g. "Economy" / "VIP". Only a label for now; pricing will hang off these later.
+// A tenant's own trip classes, e.g. "Economy" / "VIP". Pricing is set per class.
 model TripClass {
   id String @id @default(cuid())
 
@@ -40,7 +40,8 @@ model TripClass {
 
   archivedAt DateTime?
 
-  trips Trip[]
+  trips   Trip[]
+  pricing Pricing[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -99,15 +100,18 @@ model Trip {
 
   notes String?
 
+  // The location picked at booking, its name at the time, and the exact point within it.
+  pickup          Location @relation("TripPickup", fields: [pickupId], references: [id])
   pickupId        String
   pickupSnapshot  String
-  pickupLatitude  Decimal @db.Decimal(9, 6)
-  pickupLongitude Decimal @db.Decimal(9, 6)
+  pickupLatitude  Decimal  @db.Decimal(9, 6)
+  pickupLongitude Decimal  @db.Decimal(9, 6)
 
+  dropoff          Location @relation("TripDropoff", fields: [dropoffId], references: [id])
   dropoffId        String
   dropoffSnapshot  String
-  dropoffLatitude  Decimal @db.Decimal(9, 6)
-  dropoffLongitude Decimal @db.Decimal(9, 6)
+  dropoffLatitude  Decimal  @db.Decimal(9, 6)
+  dropoffLongitude Decimal  @db.Decimal(9, 6)
 
   // Link a trip to another trip such that we can keep track of round-about trips.
   previousTrip   Trip?   @relation("TripChain", fields: [tenantId, previousTripId], references: [tenantId, id], onDelete: Restrict)
@@ -129,30 +133,24 @@ model Trip {
 model TripEvent {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  staff   Staff  @relation(fields: [tenantId, staffId], references: [tenantId, id])
+  staff   Staff  @relation(fields: [staffId], references: [id])
   staffId String
 
-  trip   Trip   @relation(fields: [tenantId, tripId], references: [tenantId, id])
+  trip   Trip   @relation(fields: [tripId], references: [id])
   tripId String
 
   action String
 
   createdAt DateTime @default(now())
 
-  @@index([tenantId, tripId])
+  @@index([tripId])
 }
 
 model TripReport {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  trip   Trip   @relation(fields: [tenantId, tripId], references: [tenantId, id])
-  tripId String
+  trip   Trip   @relation(fields: [tripId], references: [id])
+  tripId String @unique
 
   startedAt     DateTime
   vehiclePickup String
@@ -170,18 +168,12 @@ model TripReport {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@unique([tenantId, id])
-  @@unique([tenantId, tripId])
 }
 
 model TripStop {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  report   TripReport @relation(fields: [tenantId, reportId], references: [tenantId, id])
+  report   TripReport @relation(fields: [reportId], references: [id])
   reportId String
 
   locationId String?
@@ -194,21 +186,18 @@ model TripStop {
 
   notes String?
 
-  @@index([tenantId, reportId])
+  @@index([reportId])
 }
 
 model TripExpense {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  report   TripReport @relation(fields: [tenantId, reportId], references: [tenantId, id])
+  report   TripReport @relation(fields: [reportId], references: [id])
   reportId String
 
   amount Decimal     @db.Decimal(12, 2)
   type   ExpenseType
   notes  String?
 
-  @@index([tenantId, reportId])
+  @@index([reportId])
 }

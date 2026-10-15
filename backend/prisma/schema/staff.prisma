@@ -43,10 +43,7 @@ model Staff {
 model StaffSession {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  staff   Staff  @relation(fields: [tenantId, staffId], references: [tenantId, id])
+  staff   Staff  @relation(fields: [staffId], references: [id])
   staffId String
 
   refreshToken String @unique
@@ -58,7 +55,7 @@ model StaffSession {
   ipAddress String?
   userAgent String?
 
-  @@index([tenantId, staffId])
+  @@index([staffId])
 }
 
 model StaffInvitation {
