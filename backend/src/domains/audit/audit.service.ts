@@ -1,0 +1,35 @@
+import { prisma } from "../../shared/utils/prisma.js";
+import type { Prisma } from "../../../generated/prisma/client.js";
+
+// Every recorded event. Kept in one place so the log stays searchable by a fixed set of names.
+// The log is append-only: a database trigger rejects any update or delete, so nothing here can rewrite history.
+export const AUDIT_ACTIONS = {
+    INVITATION_SENT: "admin.invitation.sent",
+    INVITATION_REVOKED: "admin.invitation.revoked",
+} as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
+
+type AuditEntry = {
+    // The admin who did it, or null for the system (the seed) and for sign in attempts on emails that aren't admins.
+    adminId: string | null;
+    // The company the action touched, if any.
+    tenantId?: string | null;
+    action: AuditAction;
+    // What the event is about, e.g. an Admin, AdminSession, or AdminInvitation, and its id.
+    entityType: string;
+    entityId: string;
+    before?: Prisma.InputJsonValue;
+    after?: Prisma.InputJsonValue;
+    ipAddress?: string | null;
+};
+
+type Client = typeof prisma | Prisma.TransactionClient;
+
+export default class AuditService {
+    // Pass the transaction client when the event is part of a change, so the change and its record are saved together
+    // or not at all.
+    static record = async ({ ipAddress = null, tenantId = null, ...entry }: AuditEntry, client: Client = prisma) => {
+        await client.auditLog.create({ data: { ...entry, tenantId, ipAddress } });
+    }
+}

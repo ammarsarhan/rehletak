@@ -16,7 +16,8 @@
     "generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:status": "prisma migrate status"
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -28,6 +29,7 @@
     "hono": "catalog:",
     "ioredis": "^6.0.0",
     "pg": "^8.23.0",
+    "resend": "^6.30.0",
     "zod": "catalog:"
   },
   "devDependencies": {
