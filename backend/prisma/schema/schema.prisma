@@ -1,13 +1,20 @@
-// Models live in per-domain files alongside this one (tenant, staff, customer, admin, fleet, trip, notification, analytics).
+// Models live in per-domain files alongside this one (tenant, staff, customer, admin, location, pricing, fleet, trip,
+// notification, analytics).
 //
 // Tenancy rules every tenant-owned model follows:
-// 1. It has a tenantId, even child tables like TripStop. Tenant filtering (and RLS, if we add it) never needs a join.
+// 1. It has a tenantId, so tenant filtering (and RLS, if we add it) never needs a join.
 // 2. It exposes @@unique([tenantId, id]), and relations between tenant-owned models reference (tenantId, id) instead
 //    of id alone. The database then rejects any row pointing across tenants, whatever the application code does.
 // 3. Optional relations use onDelete: Restrict. Prisma's default for them, SetNull, would also try to null tenantId.
 // 4. Uniqueness is per tenant (@@unique([tenantId, ...])), unless a value has to be global (staff emails, storage keys).
+// 5. It has a direct relation to Tenant, even when a required parent already implies it. The schema reads plainly, and
+//    the guarantee doesn't silently disappear if that parent relation is later made optional.
 //
-// Platform-level models (Tenant itself, Admin*, AuditLog) have no tenantId.
+// Platform-level models (Tenant itself, Admin*, AuditLog, Location) have no tenantId.
+//
+// Neither do records that only exist through an owner: StaffSession, CustomerSession, VehicleImage, TripEvent,
+// TripReport (and its TripStop, TripExpense), NotificationDelivery. They reference their owner by id and reach the
+// tenant through it.
 
 generator client {
   provider = "prisma-client"

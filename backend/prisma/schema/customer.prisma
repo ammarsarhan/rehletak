@@ -57,10 +57,7 @@ model Customer {
 model CustomerSession {
   id String @id @default(cuid())
 
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-  tenantId String
-
-  customer   Customer @relation(fields: [tenantId, customerId], references: [tenantId, id])
+  customer   Customer @relation(fields: [customerId], references: [id])
   customerId String
 
   refreshToken String @unique
@@ -72,7 +69,7 @@ model CustomerSession {
   ipAddress String?
   userAgent String?
 
-  @@index([tenantId, customerId])
+  @@index([customerId])
 }
 
 // Booking without an account. Verified by phone OTP only, guests have no email verification path.
