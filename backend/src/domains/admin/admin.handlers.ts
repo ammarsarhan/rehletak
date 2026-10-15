@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import AdminService from "./admin.service.js";
 import TokenService from "../token/token.service.js";
 import { acceptAdminInvitationSchema, adminInvitationTokenSchema, adminSignInSchema, adminVerifySchema } from "./admin.validators.js";
+import { ForbiddenError, UnauthorizedError } from "../../shared/utils/error.js";
 import validate from "../../shared/middleware/validate.js";
 import { bodyKey, createRateLimitKey, getClientIp, ipKey, rateLimit } from "../../shared/middleware/rateLimit.js";
 
@@ -87,5 +88,26 @@ export const adminVerifyHandler = factory.createHandlers(
         TokenService.clearChallengeCookie(c);
         TokenService.setAuthenticationCookies(c, "admin", tokens);
         return c.json({ success: true, data: { admin } }, 200);
+    }
+)
+
+export const adminRefreshHandler = factory.createHandlers(
+    rateLimit({ limit: 60, windowMs: 15 * 60 * 1000, key: ipKey("admin:refresh") }),
+    async (c) => {
+        const { ipAddress, userAgent } = getRequestInfo(c);
+
+        try {
+            const { admin, ...tokens } = await adminService.refresh(TokenService.getRefreshToken(c, "admin"), ipAddress, userAgent);
+
+            TokenService.setAuthenticationCookies(c, "admin", tokens);
+            return c.json({ success: true, data: { admin } }, 200);
+        } catch (error) {
+            // Clear the cookies when the session is over, so the browser stops sending them.
+            if (error instanceof UnauthorizedError || error instanceof ForbiddenError) {
+                TokenService.clearAuthenticationCookies(c, "admin");
+            }
+
+            throw error;
+        }
     }
 )

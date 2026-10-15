@@ -316,4 +316,46 @@ export default class AdminService {
 
         return admin;
     }
+
+    refresh = async (refreshToken: string | undefined, ipAddress: string | null, userAgent: string | null) => {
+        if (!refreshToken) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+
+        // Sessions only store the hash of the refresh token, so look it up the same way.
+        const currentHash = TokenService.hashRefreshToken(refreshToken);
+        const session = await prisma.adminSession.findUnique({ where: { refreshToken: currentHash }, include: { admin: true } });
+
+        if (!session) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+
+        const absoluteExpiresAt = new Date(session.createdAt.getTime() + this.SESSION_ABSOLUTE_LIFETIME);
+        const now = new Date();
+
+        if (session.revokedAt || session.expiresAt <= now || absoluteExpiresAt <= now) {
+            throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+        }
+
+        // Check the admin again, since they may have been deactivated since signing in.
+        if (session.admin.status !== AdminStatus.ACTIVE) {
+            await prisma.$transaction(async (tx) => {
+                await tx.adminSession.update({ where: { id: session.id }, data: { revokedAt: now } });
+                await AuditService.record({ adminId: session.admin.id, action: AUDIT_ACTIONS.SESSION_REVOKED, entityType: "AdminSession", entityId: session.id, after: { reason: "account_inactive" }, ipAddress }, tx);
+            });
+
+            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+        }
+
+        const { accessToken, refreshToken: newRefreshToken, refreshTokenHash, expiresAt: slidingExpiresAt } = await TokenService.generateTokenPair("admin", session.admin.id, {});
+
+        // Never extend the session past its absolute lifetime.
+        const expiresAt = slidingExpiresAt < absoluteExpiresAt ? slidingExpiresAt : absoluteExpiresAt;
+
+        // Rotate the refresh token in place. Matching on the old hash makes sure two requests can't both use it.
+        const { count } = await prisma.adminSession.updateMany({
+            where: { id: session.id, refreshToken: currentHash, revokedAt: null },
+            data: { refreshToken: refreshTokenHash, expiresAt, ipAddress, userAgent },
+        });
+
+        if (count === 0) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+
+        return { admin: createAdminResponse(session.admin), accessToken, refreshToken: newRefreshToken, expiresAt };
+    }
 }

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
     acceptAdminInvitationHandler,
     adminInvitationTotpHandler,
+    adminRefreshHandler,
     adminSignInHandler,
     adminVerifyHandler,
     lookupAdminInvitationHandler,
@@ -14,5 +15,6 @@ const admin = new Hono()
     .post("/invitations/accept", ...acceptAdminInvitationHandler)
     .post("/auth/sign-in", ...adminSignInHandler)
     .post("/auth/verify", ...adminVerifyHandler)
+    .post("/auth/refresh", ...adminRefreshHandler)
 
 export default admin;
