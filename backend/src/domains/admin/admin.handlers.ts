@@ -2,9 +2,9 @@ import { createFactory } from "hono/factory";
 import type { Context } from "hono";
 import AdminService from "./admin.service.js";
 import TokenService from "../token/token.service.js";
-import { acceptAdminInvitationSchema, adminInvitationTokenSchema } from "./admin.validators.js";
+import { acceptAdminInvitationSchema, adminInvitationTokenSchema, adminSignInSchema } from "./admin.validators.js";
 import validate from "../../shared/middleware/validate.js";
-import { getClientIp, ipKey, rateLimit } from "../../shared/middleware/rateLimit.js";
+import { bodyKey, getClientIp, ipKey, rateLimit } from "../../shared/middleware/rateLimit.js";
 
 const factory = createFactory();
 
@@ -49,5 +49,19 @@ export const acceptAdminInvitationHandler = factory.createHandlers(
 
         TokenService.setAuthenticationCookies(c, "admin", tokens);
         return c.json({ success: true, data: { admin } }, 201);
+    }
+)
+
+// Step one of signing in. A correct password only earns a short-lived challenge, never a session.
+export const adminSignInHandler = factory.createHandlers(
+    rateLimit({ limit: 10, windowMs: 15 * 60 * 1000, key: ipKey("admin:sign-in") }),
+    rateLimit({ limit: 5, windowMs: 15 * 60 * 1000, key: bodyKey("admin:sign-in", "identifier", "email") }),
+    validate("json", adminSignInSchema),
+    async (c) => {
+        const { email, password } = c.req.valid("json");
+        const admin = await adminService.checkPassword(email, password, getRequestInfo(c).ipAddress);
+
+        await TokenService.setChallengeCookie(c, admin.id);
+        return c.json({ success: true, data: { twoFactorRequired: true } }, 200);
     }
 )

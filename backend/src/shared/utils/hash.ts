@@ -11,3 +11,13 @@ export const compare = async (password: string, hash: string) => {
         return false;
     }
 }
+
+// A real hash of a password nobody has, made once. Checking against it when an account doesn't exist takes as long as
+// checking a real password, so response times don't reveal which accounts exist.
+let dummy: Promise<string> | undefined;
+
+export const compareAgainstNothing = async (password: string) => {
+    dummy ??= hash("not-a-real-password");
+    await compare(password, await dummy);
+    return false;
+}

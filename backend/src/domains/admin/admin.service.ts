@@ -2,11 +2,12 @@ import { prisma } from "../../shared/utils/prisma.js";
 import { generateToken, hashToken } from "../../shared/utils/token.js";
 import { decrypt, encrypt } from "../../shared/utils/encryption.js";
 import { createTotpSecret, getTotpUri, verifyTotp } from "../../shared/utils/totp.js";
-import { hash } from "../../shared/utils/hash.js";
-import { BadRequestError, ConflictError, ERROR_CODES, ServiceUnavailableError } from "../../shared/utils/error.js";
+import { compare, compareAgainstNothing, hash } from "../../shared/utils/hash.js";
+import { BadRequestError, ConflictError, ERROR_CODES, ForbiddenError, ServiceUnavailableError, UnauthorizedError } from "../../shared/utils/error.js";
 import MessagingService from "../messaging/messaging.service.js";
 import TokenService from "../token/token.service.js";
 import AuditService, { AUDIT_ACTIONS } from "../audit/audit.service.js";
+import { AdminStatus } from "../../../generated/prisma/enums.js";
 import type { Admin } from "../../../generated/prisma/client.js";
 import type { AcceptAdminInvitationPayload } from "./admin.validators.js";
 
@@ -248,5 +249,36 @@ export default class AdminService {
         });
 
         return { admin: createAdminResponse(admin), accessToken, refreshToken, expiresAt };
+    }
+
+    // The first half of signing in: checks the password. The caller then asks for a two-factor code (see verifySignIn).
+    checkPassword = async (email: string, password: string, ipAddress: string | null) => {
+        const admin = await prisma.admin.findUnique({ where: { email } });
+
+        // Use the same error for both cases so the response doesn't reveal which accounts exist.
+        // Attempts on emails that aren't admins are still recorded, since they can mean someone is guessing at accounts.
+        if (!admin) {
+            await compareAgainstNothing(password);
+            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_FAILED, entityType: "Email", entityId: email, ipAddress });
+            throw new UnauthorizedError("The email or password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
+        }
+
+        if (!(await compare(password, admin.passwordHash))) {
+            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_FAILED, entityType: "Admin", entityId: admin.id, ipAddress });
+            throw new UnauthorizedError("The email or password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
+        }
+
+        // Checked after the password, so only someone who knows it learns the account is inactive.
+        if (admin.status !== AdminStatus.ACTIVE) {
+            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
+            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+        }
+
+        if (!admin.totpSecret) throw new ForbiddenError("Two-factor authentication isn't set up for this account.", ERROR_CODES.TOTP_SETUP_REQUIRED);
+
+        // A correct password with no code after it can mean the password leaked, so the half-finished sign in is recorded too.
+        await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_PASSED, entityType: "Admin", entityId: admin.id, ipAddress });
+
+        return admin;
     }
 }

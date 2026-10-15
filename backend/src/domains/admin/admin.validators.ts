@@ -43,3 +43,9 @@ export const acceptAdminInvitationSchema = z.object({
 });
 
 export type AcceptAdminInvitationPayload = z.infer<typeof acceptAdminInvitationSchema>;
+
+// Only checks the password is there: rule changes must never lock out passwords set under the old rules.
+export const adminSignInSchema = z.object({
+    email: emailSchema,
+    password: z.string({ error: "Password is required." }).min(1, "Password is required."),
+});

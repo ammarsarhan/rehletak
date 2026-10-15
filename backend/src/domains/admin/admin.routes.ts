@@ -1,9 +1,16 @@
 import { Hono } from "hono";
-import { acceptAdminInvitationHandler, adminInvitationTotpHandler, lookupAdminInvitationHandler } from "./admin.handlers.js";
+import {
+    acceptAdminInvitationHandler,
+    adminInvitationTotpHandler,
+    adminSignInHandler,
+    lookupAdminInvitationHandler,
+} from "./admin.handlers.js";
 
+// The auth routes live under /admin/auth because the admin refresh cookie (and the sign in challenge) are scoped to that path.
 const admin = new Hono()
     .get("/invitations/lookup", ...lookupAdminInvitationHandler)
     .post("/invitations/totp", ...adminInvitationTotpHandler)
     .post("/invitations/accept", ...acceptAdminInvitationHandler)
+    .post("/auth/sign-in", ...adminSignInHandler)
 
 export default admin;
