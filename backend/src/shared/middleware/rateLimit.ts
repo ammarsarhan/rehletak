@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { createMiddleware } from "hono/factory";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import { cache } from "../utils/redis.js";
-import { ERROR_CODES, ServiceUnavailableError, TooManyRequestsError } from "../utils/error.js";
+import { errorCodes, ServiceUnavailableError, TooManyRequestsError } from "../utils/error.js";
 
 // What a limit is counted against.
 export type RateLimitSubject = "ip" | "identifier" | "user";
@@ -49,7 +49,7 @@ export const bodyKey = (scope: string, subject: RateLimitSubject, field: string)
 
 // Fixed window: the first request creates the counter with the window as its expiry, and Redis deletes it when the window
 // ends. One script, so concurrent requests can't slip past the limit. A counter that somehow lost its expiry gets it back.
-const CONSUME = `
+const consumeScript = `
 local count = redis.call("INCR", KEYS[1])
 local ttl = redis.call("PTTL", KEYS[1])
 if ttl < 0 then
@@ -61,7 +61,7 @@ return { count, ttl }
 
 // Counts this request and returns the new count and the milliseconds left in the window.
 const consume = async (key: string, windowMs: number) => {
-    const [count, ttl] = await cache.eval(CONSUME, 1, `ratelimit:${key}`, windowMs) as [number, number];
+    const [count, ttl] = await cache.eval(consumeScript, 1, `ratelimit:${key}`, windowMs) as [number, number];
     return { count, ttl };
 }
 
@@ -87,7 +87,7 @@ export const rateLimit = ({ limit, windowMs, key }: RateLimitOptions) => createM
                 const retryAfter = Math.max(1, Math.ceil(ttl / 1000));
 
                 c.header("Retry-After", String(retryAfter));
-                throw new TooManyRequestsError(`Too many requests. Please try again in ${formatWait(retryAfter)}.`, ERROR_CODES.RATE_LIMITED);
+                throw new TooManyRequestsError(`Too many requests. Please try again in ${formatWait(retryAfter)}.`, errorCodes.RATE_LIMITED);
             }
         }
 

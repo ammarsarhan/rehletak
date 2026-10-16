@@ -77,7 +77,7 @@ export default function Shell({ children }: { children: ReactNode }) {
                 </header>
 
                 <main className="flex-1 overflow-y-auto">
-                    <div className="mx-auto flex w-full max-w-6xl flex-col p-6 sm:p-10">{children}</div>
+                    <div className="flex w-full flex-col px-6 py-8 sm:px-8">{children}</div>
                 </main>
             </div>
         </div>

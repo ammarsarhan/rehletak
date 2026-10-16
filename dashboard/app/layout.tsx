@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { MotionConfig } from "motion/react";
+import QueryProvider from "@/components/QueryProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-white">
         {/* Turns movement off app-wide for people who ask their OS to reduce motion, keeping only the fades. */}
-        <MotionConfig reducedMotion="user">{children}</MotionConfig>
+        <MotionConfig reducedMotion="user">
+          <QueryProvider>{children}</QueryProvider>
+        </MotionConfig>
       </body>
     </html>
   );

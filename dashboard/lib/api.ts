@@ -16,7 +16,7 @@ export type ApiError = {
 // Each audience has its own session, cookies and refresh route. Staff join here once their auth is built.
 type Audience = "admin";
 
-const REFRESH_PATHS: Record<Audience, string> = {
+const refreshPaths: Record<Audience, string> = {
     admin: "/admin/auth/refresh",
 };
 
@@ -29,7 +29,7 @@ const audienceOf = (input: RequestInfo | URL): Audience | null => {
 const refreshing: Partial<Record<Audience, Promise<boolean>>> = {};
 
 const refresh = (audience: Audience) => {
-    refreshing[audience] ??= fetch(`${endpoint}${REFRESH_PATHS[audience]}`, { method: "POST", credentials: "include" })
+    refreshing[audience] ??= fetch(`${endpoint}${refreshPaths[audience]}`, { method: "POST", credentials: "include" })
         .then((response) => response.ok)
         .catch(() => false)
         .finally(() => { delete refreshing[audience]; });

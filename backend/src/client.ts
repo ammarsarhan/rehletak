@@ -6,3 +6,4 @@ import type { AppType } from "./app.js";
 export type { AppType };
 export type Client = ReturnType<typeof hc<AppType>>;
 export type { ErrorCode } from "./shared/utils/error.js";
+export type { AuditAction } from "./domains/audit/audit.service.js";
