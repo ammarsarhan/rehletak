@@ -8,6 +8,13 @@ export function proxy(request: NextRequest) {
   const section = host.startsWith("admin.") ? "admin" : "staff";
 
   const url = request.nextUrl.clone();
+
+  // The admin side has no home page of its own, so its root (where the logo and sign in land) opens on tenants.
+  if (section === "admin" && url.pathname === "/") {
+    url.pathname = "/tenants";
+    return NextResponse.redirect(url);
+  }
+
   url.pathname = `/${section}${url.pathname === "/" ? "" : url.pathname}`;
 
   return NextResponse.rewrite(url);

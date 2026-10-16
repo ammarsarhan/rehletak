@@ -157,3 +157,6 @@ generated/
 
 # Local https certificates (mkcert)
 .certs
+
+# Personal Claude Code settings
+.claude/settings.local.json

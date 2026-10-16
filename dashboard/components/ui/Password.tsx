@@ -3,11 +3,11 @@
 import { useState, type ComponentProps } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { IconEye, IconEyeOff } from "@tabler/icons-react";
-import Input from "./input";
+import Input from "./Input";
 
-type PasswordInputProps = Omit<ComponentProps<typeof Input>, "type" | "trailing">;
+type PasswordProps = Omit<ComponentProps<typeof Input>, "type" | "trailing">;
 
-export default function PasswordInput(props: PasswordInputProps) {
+export default function Password(props: PasswordProps) {
     const [visible, setVisible] = useState(false);
     const Icon = visible ? IconEye : IconEyeOff;
 
