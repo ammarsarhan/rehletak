@@ -4,10 +4,10 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { api, type ApiError } from "@/lib/api";
-import Button from "@/components/ui/button";
-import Input from "@/components/ui/input";
-import PasswordInput from "@/components/ui/password";
-import FormError from "@/components/ui/form-error";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Password from "@/components/ui/Password";
+import FormError from "@/components/ui/FormError";
 
 type Step = "credentials" | "code";
 type Errors = { email?: string; password?: string; code?: string; form?: string };
@@ -116,7 +116,7 @@ export default function AdminSignIn() {
                     </div>
 
                     <Input label="Email" type="email" name="email" autoComplete="username" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} />
-                    <PasswordInput label="Password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+                    <Password label="Password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
 
                     <FormError message={errors.form} />
 

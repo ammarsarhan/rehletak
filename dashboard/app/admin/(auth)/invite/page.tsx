@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { QRCodeSVG } from "qrcode.react";
 import { api, type ApiError } from "@/lib/api";
-import Button from "@/components/ui/button";
-import Input from "@/components/ui/input";
-import PasswordInput from "@/components/ui/password";
-import FormError from "@/components/ui/form-error";
-import InvitationProblem from "@/components/auth/invitation-problem";
-import { useInvitation } from "@/components/auth/use-invitation";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
+import Password from "@/components/ui/Password";
+import FormError from "@/components/ui/FormError";
+import InvitationProblem from "@/components/auth/InvitationProblem";
+import { useInvitation } from "@/components/auth/useInvitation";
 
 type Step = "details" | "two-factor";
 type Field = "firstName" | "lastName" | "password" | "code";
@@ -152,7 +152,7 @@ export default function AdminInvite({ searchParams }: PageProps<"/admin/invite">
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <PasswordInput label="Password" name="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
+                        <Password label="Password" name="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} />
                         {!errors.password && <p className="text-xs text-neutral-500">At least 8 characters, with an uppercase letter, a lowercase letter, and a number.</p>}
                     </div>
 

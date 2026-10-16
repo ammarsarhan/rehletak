@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Logo from "@/components/ui/logo";
+import Logo from "@/components/ui/Logo";
 
 // Auth pages aren't useful search results. The (auth) group doesn't change the URLs: /sign-in, /invite.
 export const metadata: Metadata = {

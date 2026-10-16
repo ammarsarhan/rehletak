@@ -1,5 +1,5 @@
 import { IconAlertCircle } from "@tabler/icons-react";
-import AppLink from "@/components/ui/link";
+import Link from "@/components/ui/Link";
 
 // Shown instead of the form when an invitation link is expired, already used, or not a real invitation.
 export default function InvitationProblem({ message }: { message: string }) {
@@ -10,7 +10,7 @@ export default function InvitationProblem({ message }: { message: string }) {
                 <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">This invitation can&apos;t be used</h1>
                 <p className="text-sm text-neutral-500">{message} If you still need access, ask whoever invited you to send a new invitation.</p>
             </div>
-            <AppLink href="/sign-in" className="self-start">Go to sign in</AppLink>
+            <Link href="/sign-in" className="self-start">Go to sign in</Link>
         </div>
     );
 }
