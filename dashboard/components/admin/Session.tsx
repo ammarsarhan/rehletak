@@ -4,26 +4,23 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useRouter } from "next/navigation";
 import { IconCloudOff } from "@tabler/icons-react";
 import { api } from "@/lib/api";
-import Button from "@/components/ui/button";
+import Button from "@/components/ui/Button";
 
 type SessionBody = Awaited<ReturnType<Awaited<ReturnType<typeof api.admin.auth.session.$get>>["json"]>>;
 
 // Whatever the backend's session route returns, so this stays in sync with it.
 export type Admin = Extract<SessionBody, { success: true }>["data"]["admin"];
 
-type AdminSessionValue = {
+type SessionValue = {
     admin: Admin;
     signOut: () => Promise<void>;
 };
 
-const AdminSessionContext = createContext<AdminSessionValue | null>(null);
+const SessionContext = createContext<SessionValue | null>(null);
 
 type State = { status: "loading" } | { status: "ready"; admin: Admin } | { status: "unreachable" };
 
-// Guards every signed in admin page: nothing renders until the backend confirms who's signed in. Expired access tokens
-// are refreshed by the api client on the way. Anyone without a valid session is sent to sign in. This only hides the
-// pages; the backend checks every admin request itself.
-export function AdminSession({ children }: { children: ReactNode }) {
+export function Session({ children }: { children: ReactNode }) {
     const router = useRouter();
     const [state, setState] = useState<State>({ status: "loading" });
 
@@ -79,12 +76,12 @@ export function AdminSession({ children }: { children: ReactNode }) {
         );
     }
 
-    return <AdminSessionContext.Provider value={{ admin: state.admin, signOut }}>{children}</AdminSessionContext.Provider>;
+    return <SessionContext.Provider value={{ admin: state.admin, signOut }}>{children}</SessionContext.Provider>;
 }
 
-export function useAdminSession() {
-    const context = useContext(AdminSessionContext);
-    if (!context) throw new Error("useAdminSession must be used inside AdminSession.");
+export function useSession() {
+    const context = useContext(SessionContext);
+    if (!context) throw new Error("useSession must be used inside Session.");
 
     return context;
 }

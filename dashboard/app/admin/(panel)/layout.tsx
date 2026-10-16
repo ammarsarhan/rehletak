@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { AdminSession } from "@/components/admin/admin-session";
-import AdminHeader from "@/components/admin/admin-header";
+import { Session } from "@/components/admin/Session";
+import Shell from "@/components/admin/Shell";
 
-// Every signed in admin page lives in this group, so each one is guarded by AdminSession without having to remember to.
+// Every signed in admin page lives in this group, so each one is guarded by Session without having to remember to.
 export const metadata: Metadata = {
-    title: "Admin",
+    title: {
+        default: "Admin",
+        template: "%s · Rehletak admin",
+    },
     // Nothing behind the admin area belongs in search results.
     robots: {
         index: false,
@@ -14,11 +17,8 @@ export const metadata: Metadata = {
 
 export default function AdminPanelLayout({ children }: LayoutProps<"/admin">) {
     return (
-        <AdminSession>
-            <div className="flex min-h-screen flex-col">
-                <AdminHeader />
-                <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col p-6 sm:p-10">{children}</main>
-            </div>
-        </AdminSession>
+        <Session>
+            <Shell>{children}</Shell>
+        </Session>
     );
 }
