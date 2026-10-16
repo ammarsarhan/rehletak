@@ -21,7 +21,7 @@ const slide: Variants = {
 
 const slideProps = { variants: slide, initial: "enter", animate: "center", exit: "exit", transition: { duration: 0.25, ease: "easeOut" } } as const;
 
-const NETWORK_ERROR = "Could not reach the server. Please check your connection and try again.";
+const networkError = "Could not reach the server. Please check your connection and try again.";
 
 // Served at admin.rehletak.app/sign-in (the proxy maps the admin host onto app/admin).
 // Admins sign in with their password, then a code from their authenticator app. The password alone never starts a session:
@@ -70,7 +70,7 @@ export default function AdminSignIn() {
 
             setErrors(field("email") || field("password") ? { email: field("email"), password: field("password") } : { form: error.message });
         } catch {
-            setErrors({ form: NETWORK_ERROR });
+            setErrors({ form: networkError });
         } finally {
             setLoading(false);
         }
@@ -98,7 +98,7 @@ export default function AdminSignIn() {
 
             setErrors(error.code === "TOTP_CODE_INVALID" ? { code: error.message } : { form: error.message });
         } catch {
-            setErrors({ form: NETWORK_ERROR });
+            setErrors({ form: networkError });
         } finally {
             setLoading(false);
         }

@@ -28,7 +28,7 @@ const slide: Variants = {
 
 const slideProps = { variants: slide, initial: "enter", animate: "center", exit: "exit", transition: { duration: 0.25, ease: "easeOut" } } as const;
 
-const NETWORK_ERROR = "Could not reach the server. Please check your connection and try again.";
+const networkError = "Could not reach the server. Please check your connection and try again.";
 
 // Served at admin.rehletak.app/invite (the proxy maps the admin host onto app/admin).
 // Where an invited admin creates their account. After their details, they add Rehletak to an authenticator app and confirm
@@ -84,7 +84,7 @@ export default function AdminInvite({ searchParams }: PageProps<"/admin/invite">
             const { error } = (await res.json()) as unknown as ApiError;
             if (!isInvitationError(error)) setErrors({ form: error.message });
         } catch {
-            setErrors({ form: NETWORK_ERROR });
+            setErrors({ form: networkError });
         } finally {
             setLoading(false);
         }
@@ -118,7 +118,7 @@ export default function AdminInvite({ searchParams }: PageProps<"/admin/invite">
 
             setErrors(Object.keys(fields).length ? fields : { form: error.message });
         } catch {
-            setErrors({ form: NETWORK_ERROR });
+            setErrors({ form: networkError });
         } finally {
             setLoading(false);
         }

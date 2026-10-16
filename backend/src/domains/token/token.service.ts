@@ -121,29 +121,29 @@ export default class TokenService {
 
     // The step between an admin's correct password and their two-factor code. The challenge proves the password was right
     // and names who still owes a code, for 5 minutes. It uses its own audience, so it can never pass as an access token.
-    private static readonly CHALLENGE_AUDIENCE = "admin-challenge";
-    private static readonly CHALLENGE_COOKIE = "admin_challenge";
-    private static readonly CHALLENGE_LIFETIME = 5 * 60;
+    private static readonly challengeAudience = "admin-challenge";
+    private static readonly challengeCookie = "admin_challenge";
+    private static readonly challengeLifetime = 5 * 60;
 
     static setChallengeCookie = async (c: Context, adminId: string) => {
         const now = Math.floor(Date.now() / 1000);
-        const token = await sign({ sub: adminId, aud: this.CHALLENGE_AUDIENCE, iat: now, exp: now + this.CHALLENGE_LIFETIME }, this.getSecret("admin"), "HS256");
+        const token = await sign({ sub: adminId, aud: this.challengeAudience, iat: now, exp: now + this.challengeLifetime }, this.getSecret("admin"), "HS256");
 
         // Only sent to the admin auth routes, which are the only ones that read it.
-        setCookie(c, this.CHALLENGE_COOKIE, token, {
+        setCookie(c, this.challengeCookie, token, {
             ...this.baseCookieOptions,
             path: config.admin.refreshPath,
-            maxAge: this.CHALLENGE_LIFETIME,
+            maxAge: this.challengeLifetime,
         });
     }
 
     // The admin id behind the challenge, or null when it's missing, expired, or not genuine.
     static verifyChallengeCookie = async (c: Context) => {
-        const token = getCookie(c, this.CHALLENGE_COOKIE);
+        const token = getCookie(c, this.challengeCookie);
         if (!token) return null;
 
         try {
-            const payload = await verify(token, this.getSecret("admin"), { alg: "HS256", aud: this.CHALLENGE_AUDIENCE });
+            const payload = await verify(token, this.getSecret("admin"), { alg: "HS256", aud: this.challengeAudience });
             return typeof payload.sub === "string" ? payload.sub : null;
         } catch {
             return null;
@@ -151,7 +151,7 @@ export default class TokenService {
     }
 
     static clearChallengeCookie = (c: Context) => {
-        deleteCookie(c, this.CHALLENGE_COOKIE, { ...this.baseCookieOptions, path: config.admin.refreshPath });
+        deleteCookie(c, this.challengeCookie, { ...this.baseCookieOptions, path: config.admin.refreshPath });
     }
 
     // Deleting a cookie only works with the same path and options it was set with.

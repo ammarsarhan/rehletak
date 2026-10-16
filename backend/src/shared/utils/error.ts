@@ -1,7 +1,7 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 // Create a set of standardized error codes that can be used to define and handle issues gracefully on the client-side.
-export const ERROR_CODES = {
+export const errorCodes = {
   // Generic
   INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
   SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
@@ -27,7 +27,7 @@ export const ERROR_CODES = {
 } as const;
 
 export type ErrorCode =
-  (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+  (typeof errorCodes)[keyof typeof errorCodes];
 
 // Generic AppError class that will be used to parent/construct throwable error classes.
 export default class AppError extends Error {

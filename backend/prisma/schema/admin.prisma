@@ -83,6 +83,10 @@ model AuditLog {
 
   createdAt DateTime @default(now())
 
+  // The admin log lists newest first, filtered by who did it or what they did.
+  @@index([createdAt, id])
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
   @@index([entityType, entityId])
   @@index([tenantId, createdAt])
 }

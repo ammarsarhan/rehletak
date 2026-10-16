@@ -1,11 +1,13 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
-import Header from "@/components/admin/Header";
+import Logs from "@/components/admin/logs/Logs";
 
 export const metadata: Metadata = {
     title: "Audit logs",
 };
 
-// Served at admin.rehletak.app/audit-logs. Blank until the audit-logs tools are built.
-export default function AdminAuditLogs() {
-    return <Header title="Audit logs" description="A permanent, read-only record of every action taken by or on an admin, including who did it and when." />;
+// Served at admin.rehletak.app/logs: platform events.
+export default function AdminLogs() {
+    // Logs reads its filters from the URL, so it renders in the browser once the URL is known.
+    return <Suspense><Logs scope="platform"/></Suspense>;
 }

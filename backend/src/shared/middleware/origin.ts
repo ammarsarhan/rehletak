@@ -1,7 +1,7 @@
 import { createMiddleware } from "hono/factory";
-import { ERROR_CODES, ForbiddenError } from "../utils/error.js";
+import { errorCodes, ForbiddenError } from "../utils/error.js";
 
-const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 // The auth cookies are SameSite=Lax, which still sends them on requests from any rehletak.app subdomain. This rejects
 // unsafe requests a browser sent from any page other than the dashboards, so no other page can act with someone's session.
@@ -10,8 +10,8 @@ export const requireOrigin = (allowed: string[]) => createMiddleware(async (c, n
 
     // Browsers always send Origin on these methods and pages can't change it. Requests without one aren't from a browser,
     // so they don't carry anyone else's cookies and are let through.
-    if (UNSAFE_METHODS.has(c.req.method) && origin !== undefined && !allowed.includes(origin)) {
-        throw new ForbiddenError("Requests from this origin are not allowed.", ERROR_CODES.UNTRUSTED_ORIGIN);
+    if (unsafeMethods.has(c.req.method) && origin !== undefined && !allowed.includes(origin)) {
+        throw new ForbiddenError("Requests from this origin are not allowed.", errorCodes.UNTRUSTED_ORIGIN);
     }
 
     await next();

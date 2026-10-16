@@ -3,10 +3,10 @@ import { generateToken, hashToken } from "../../shared/utils/token.js";
 import { decrypt, encrypt } from "../../shared/utils/encryption.js";
 import { createTotpSecret, getTotpUri, verifyTotp } from "../../shared/utils/totp.js";
 import { compare, compareAgainstNothing, hash } from "../../shared/utils/hash.js";
-import { BadRequestError, ConflictError, ERROR_CODES, ForbiddenError, ServiceUnavailableError, UnauthorizedError } from "../../shared/utils/error.js";
+import { BadRequestError, ConflictError, errorCodes, ForbiddenError, ServiceUnavailableError, UnauthorizedError } from "../../shared/utils/error.js";
 import MessagingService from "../messaging/messaging.service.js";
 import TokenService from "../token/token.service.js";
-import AuditService, { AUDIT_ACTIONS } from "../audit/audit.service.js";
+import AuditService, { auditActions } from "../audit/audit.service.js";
 import { AdminStatus } from "../../../generated/prisma/enums.js";
 import type { Admin } from "../../../generated/prisma/client.js";
 import type { AcceptAdminInvitationPayload } from "./admin.validators.js";
@@ -25,10 +25,10 @@ export default class AdminService {
     private readonly messagingService = new MessagingService();
 
     // Shorter than staff invitations, since an admin account has more power.
-    private readonly INVITATION_LIFETIME = 48 * 60 * 60 * 1000;
-    private readonly MAXIMUM_SESSION_LIMIT = 3;
+    private readonly invitationLifetime = 48 * 60 * 60 * 1000;
+    private readonly maximumSessionLimit = 3;
     // Admin sessions end 12 hours after signing in no matter how often they refresh, so a stolen session can't live on.
-    private readonly SESSION_ABSOLUTE_LIFETIME = 12 * 60 * 60 * 1000;
+    private readonly sessionAbsoluteLifetime = 12 * 60 * 60 * 1000;
 
     // Where invitation links point. Required in production, so a link can never point at localhost.
     private getAdminUrl = () => {
@@ -45,10 +45,10 @@ export default class AdminService {
     inviteFirstAdmin = async (email: string) => {
         const token = generateToken();
         const now = new Date();
-        const expiresAt = new Date(now.getTime() + this.INVITATION_LIFETIME);
+        const expiresAt = new Date(now.getTime() + this.invitationLifetime);
 
         const invitation = await prisma.$transaction(async (tx) => {
-            if (await tx.admin.count() > 0) throw new ConflictError("An admin already exists. Further admins must be invited by an admin.", ERROR_CODES.ACCOUNT_ALREADY_EXISTS);
+            if (await tx.admin.count() > 0) throw new ConflictError("An admin already exists. Further admins must be invited by an admin.", errorCodes.ACCOUNT_ALREADY_EXISTS);
 
             // With no admins yet, every pending invitation came from an earlier seed.
             const pending = await tx.adminInvitation.findMany({
@@ -60,7 +60,7 @@ export default class AdminService {
                 await tx.adminInvitation.updateMany({ where: { id: { in: pending.map((p) => p.id) } }, data: { revokedAt: now } });
 
                 for (const { id, email } of pending) {
-                    await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.INVITATION_REVOKED, entityType: "AdminInvitation", entityId: id, after: { email, reason: "replaced_by_seed" } }, tx);
+                    await AuditService.record({ adminId: null, action: auditActions.INVITATION_REVOKED, entityType: "AdminInvitation", entityId: id, after: { email, reason: "replaced_by_seed" } }, tx);
                 }
             }
 
@@ -86,7 +86,7 @@ export default class AdminService {
 
         await AuditService.record({
             adminId: invitorId,
-            action: AUDIT_ACTIONS.INVITATION_SENT,
+            action: auditActions.INVITATION_SENT,
             entityType: "AdminInvitation",
             entityId: invitationId,
             after: { email, expiresAt: expiresAt.toISOString() },
@@ -101,11 +101,11 @@ export default class AdminService {
         const invitation = await prisma.adminInvitation.findUnique({ where: { tokenHash: hashToken(token) } });
 
         if (!invitation || invitation.acceptedAt || invitation.revokedAt) {
-            throw new BadRequestError("This invitation link is invalid or has already been used.", ERROR_CODES.INVITATION_INVALID);
+            throw new BadRequestError("This invitation link is invalid or has already been used.", errorCodes.INVITATION_INVALID);
         }
 
         if (invitation.expiresAt <= new Date()) {
-            throw new BadRequestError("This invitation has expired. Ask for a new one.", ERROR_CODES.INVITATION_EXPIRED);
+            throw new BadRequestError("This invitation has expired. Ask for a new one.", errorCodes.INVITATION_EXPIRED);
         }
 
         return invitation;
@@ -138,12 +138,12 @@ export default class AdminService {
 
             if (count === 0) return;
 
-            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.INVITATION_TOTP_ISSUED, entityType: "AdminInvitation", entityId: invitation.id, ipAddress }, tx);
+            await AuditService.record({ adminId: null, action: auditActions.INVITATION_TOTP_ISSUED, entityType: "AdminInvitation", entityId: invitation.id, ipAddress }, tx);
         });
 
         // Whichever secret was stored is the one that counts, even if another request stored it first.
         const stored = await prisma.adminInvitation.findUniqueOrThrow({ where: { id: invitation.id }, select: { totpSecret: true } });
-        if (!stored.totpSecret) throw new BadRequestError("This invitation link is invalid or has already been used.", ERROR_CODES.INVITATION_INVALID);
+        if (!stored.totpSecret) throw new BadRequestError("This invitation link is invalid or has already been used.", errorCodes.INVITATION_INVALID);
 
         const current = decrypt(stored.totpSecret);
         return { uri: getTotpUri(current, invitation.email), secret: current };
@@ -154,17 +154,17 @@ export default class AdminService {
     acceptInvitation = async ({ token, code, password, ...details }: AcceptAdminInvitationPayload, ipAddress: string | null) => {
         const invitation = await this.findUsableInvitation(token);
 
-        if (!invitation.totpSecret) throw new BadRequestError("Set up two-factor authentication before creating your account.", ERROR_CODES.TOTP_SETUP_REQUIRED);
+        if (!invitation.totpSecret) throw new BadRequestError("Set up two-factor authentication before creating your account.", errorCodes.TOTP_SETUP_REQUIRED);
 
         const step = verifyTotp(decrypt(invitation.totpSecret), code, null);
 
         if (step === null) {
-            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.INVITATION_ACCEPT_FAILED, entityType: "AdminInvitation", entityId: invitation.id, after: { reason: "wrong_code" }, ipAddress });
-            throw new BadRequestError("That code didn't work. Check your authenticator app and try again.", ERROR_CODES.TOTP_CODE_INVALID);
+            await AuditService.record({ adminId: null, action: auditActions.INVITATION_ACCEPT_FAILED, entityType: "AdminInvitation", entityId: invitation.id, after: { reason: "wrong_code" }, ipAddress });
+            throw new BadRequestError("That code didn't work. Check your authenticator app and try again.", errorCodes.TOTP_CODE_INVALID);
         }
 
         const existing = await prisma.admin.findUnique({ where: { email: invitation.email }, select: { id: true } });
-        if (existing) throw new ConflictError("An admin account with this email already exists.", ERROR_CODES.ACCOUNT_ALREADY_EXISTS);
+        if (existing) throw new ConflictError("An admin account with this email already exists.", errorCodes.ACCOUNT_ALREADY_EXISTS);
 
         const passwordHash = await hash(password);
         const now = new Date();
@@ -176,7 +176,7 @@ export default class AdminService {
                 data: { acceptedAt: now, totpSecret: null },
             });
 
-            if (count === 0) throw new BadRequestError("This invitation link is invalid or has already been used.", ERROR_CODES.INVITATION_INVALID);
+            if (count === 0) throw new BadRequestError("This invitation link is invalid or has already been used.", errorCodes.INVITATION_INVALID);
 
             const created = await tx.admin.create({
                 data: {
@@ -194,14 +194,14 @@ export default class AdminService {
             // Recorded in the same transaction, so an admin can't exist without a record of how they got in.
             await AuditService.record({
                 adminId: created.id,
-                action: AUDIT_ACTIONS.INVITATION_ACCEPTED,
+                action: auditActions.INVITATION_ACCEPTED,
                 entityType: "AdminInvitation",
                 entityId: invitation.id,
                 after: { adminId: created.id, email: created.email, invitedBy: invitation.invitorId },
                 ipAddress,
             }, tx);
 
-            await AuditService.record({ adminId: created.id, action: AUDIT_ACTIONS.TOTP_ENABLED, entityType: "Admin", entityId: created.id, ipAddress }, tx);
+            await AuditService.record({ adminId: created.id, action: auditActions.TOTP_ENABLED, entityType: "Admin", entityId: created.id, ipAddress }, tx);
 
             return created;
         });
@@ -211,7 +211,7 @@ export default class AdminService {
     // `via` records how they got here: a new account from an invitation, or password plus two-factor code.
     createSession = async (admin: Admin, via: "invitation" | "password_and_totp", { ipAddress, userAgent }: RequestInfo) => {
         const { accessToken, refreshToken, refreshTokenHash, expiresAt: slidingExpiresAt } = await TokenService.generateTokenPair("admin", admin.id, {});
-        const expiresAt = new Date(Math.min(slidingExpiresAt.getTime(), Date.now() + this.SESSION_ABSOLUTE_LIFETIME));
+        const expiresAt = new Date(Math.min(slidingExpiresAt.getTime(), Date.now() + this.sessionAbsoluteLifetime));
 
         await prisma.$transaction(async (tx) => {
             const activeSessions = await tx.adminSession.findMany({
@@ -221,7 +221,7 @@ export default class AdminService {
             });
 
             // Revoke the oldest sessions to make way for the new one.
-            const sessionsToRevoke = activeSessions.slice(0, Math.max(0, activeSessions.length - this.MAXIMUM_SESSION_LIMIT + 1));
+            const sessionsToRevoke = activeSessions.slice(0, Math.max(0, activeSessions.length - this.maximumSessionLimit + 1));
 
             if (sessionsToRevoke.length > 0) {
                 await tx.adminSession.updateMany({
@@ -230,7 +230,7 @@ export default class AdminService {
                 });
 
                 for (const { id } of sessionsToRevoke) {
-                    await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SESSION_REVOKED, entityType: "AdminSession", entityId: id, after: { reason: "session_limit" }, ipAddress }, tx);
+                    await AuditService.record({ adminId: admin.id, action: auditActions.SESSION_REVOKED, entityType: "AdminSession", entityId: id, after: { reason: "session_limit" }, ipAddress }, tx);
                 }
             }
 
@@ -240,7 +240,7 @@ export default class AdminService {
 
             await AuditService.record({
                 adminId: admin.id,
-                action: AUDIT_ACTIONS.SIGN_IN_SUCCEEDED,
+                action: auditActions.SIGN_IN_SUCCEEDED,
                 entityType: "AdminSession",
                 entityId: session.id,
                 after: { via, userAgent, expiresAt: expiresAt.toISOString() },
@@ -259,45 +259,45 @@ export default class AdminService {
         // Attempts on emails that aren't admins are still recorded, since they can mean someone is guessing at accounts.
         if (!admin) {
             await compareAgainstNothing(password);
-            await AuditService.record({ adminId: null, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_FAILED, entityType: "Email", entityId: email, ipAddress });
-            throw new UnauthorizedError("The email or password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
+            await AuditService.record({ adminId: null, action: auditActions.SIGN_IN_PASSWORD_FAILED, entityType: "Email", entityId: email, ipAddress });
+            throw new UnauthorizedError("The email or password is incorrect.", errorCodes.INVALID_CREDENTIALS);
         }
 
         if (!(await compare(password, admin.passwordHash))) {
-            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_FAILED, entityType: "Admin", entityId: admin.id, ipAddress });
-            throw new UnauthorizedError("The email or password is incorrect.", ERROR_CODES.INVALID_CREDENTIALS);
+            await AuditService.record({ adminId: admin.id, action: auditActions.SIGN_IN_PASSWORD_FAILED, entityType: "Admin", entityId: admin.id, ipAddress });
+            throw new UnauthorizedError("The email or password is incorrect.", errorCodes.INVALID_CREDENTIALS);
         }
 
         // Checked after the password, so only someone who knows it learns the account is inactive.
         if (admin.status !== AdminStatus.ACTIVE) {
-            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
-            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+            await AuditService.record({ adminId: admin.id, action: auditActions.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
+            throw new ForbiddenError("This admin account is not active.", errorCodes.ACCOUNT_NOT_ACTIVE);
         }
 
-        if (!admin.totpSecret) throw new ForbiddenError("Two-factor authentication isn't set up for this account.", ERROR_CODES.TOTP_SETUP_REQUIRED);
+        if (!admin.totpSecret) throw new ForbiddenError("Two-factor authentication isn't set up for this account.", errorCodes.TOTP_SETUP_REQUIRED);
 
         // A correct password with no code after it can mean the password leaked, so the half-finished sign in is recorded too.
-        await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_PASSWORD_PASSED, entityType: "Admin", entityId: admin.id, ipAddress });
+        await AuditService.record({ adminId: admin.id, action: auditActions.SIGN_IN_PASSWORD_PASSED, entityType: "Admin", entityId: admin.id, ipAddress });
 
         return admin;
     }
 
     // The second half of signing in: checks the two-factor code for the admin who passed the password check.
     verifySignIn = async (adminId: string | null, code: string, ipAddress: string | null) => {
-        if (!adminId) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", ERROR_CODES.TOTP_CHALLENGE_INVALID);
+        if (!adminId) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", errorCodes.TOTP_CHALLENGE_INVALID);
 
         const admin = await prisma.admin.findUnique({ where: { id: adminId } });
 
-        if (!admin?.totpSecret) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", ERROR_CODES.TOTP_CHALLENGE_INVALID);
+        if (!admin?.totpSecret) throw new UnauthorizedError("Your sign in has expired. Please enter your email and password again.", errorCodes.TOTP_CHALLENGE_INVALID);
         if (admin.status !== AdminStatus.ACTIVE) {
-            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
-            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+            await AuditService.record({ adminId: admin.id, action: auditActions.SIGN_IN_BLOCKED, entityType: "Admin", entityId: admin.id, after: { reason: "account_inactive" }, ipAddress });
+            throw new ForbiddenError("This admin account is not active.", errorCodes.ACCOUNT_NOT_ACTIVE);
         }
 
         // A wrong code after a correct password is worth recording: it can mean someone has the password but not the phone.
         const fail = async (reason: "wrong_code" | "code_reused") => {
-            await AuditService.record({ adminId: admin.id, action: AUDIT_ACTIONS.SIGN_IN_TOTP_FAILED, entityType: "Admin", entityId: admin.id, after: { reason }, ipAddress });
-            return new BadRequestError("That code didn't work. Check your authenticator app and try again.", ERROR_CODES.TOTP_CODE_INVALID);
+            await AuditService.record({ adminId: admin.id, action: auditActions.SIGN_IN_TOTP_FAILED, entityType: "Admin", entityId: admin.id, after: { reason }, ipAddress });
+            return new BadRequestError("That code didn't work. Check your authenticator app and try again.", errorCodes.TOTP_CODE_INVALID);
         };
 
         const secret = decrypt(admin.totpSecret);
@@ -318,29 +318,29 @@ export default class AdminService {
     }
 
     refresh = async (refreshToken: string | undefined, ipAddress: string | null, userAgent: string | null) => {
-        if (!refreshToken) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+        if (!refreshToken) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", errorCodes.INVALID_REFRESH_TOKEN);
 
         // Sessions only store the hash of the refresh token, so look it up the same way.
         const currentHash = TokenService.hashRefreshToken(refreshToken);
         const session = await prisma.adminSession.findUnique({ where: { refreshToken: currentHash }, include: { admin: true } });
 
-        if (!session) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+        if (!session) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", errorCodes.INVALID_REFRESH_TOKEN);
 
-        const absoluteExpiresAt = new Date(session.createdAt.getTime() + this.SESSION_ABSOLUTE_LIFETIME);
+        const absoluteExpiresAt = new Date(session.createdAt.getTime() + this.sessionAbsoluteLifetime);
         const now = new Date();
 
         if (session.revokedAt || session.expiresAt <= now || absoluteExpiresAt <= now) {
-            throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+            throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", errorCodes.INVALID_REFRESH_TOKEN);
         }
 
         // Check the admin again, since they may have been deactivated since signing in.
         if (session.admin.status !== AdminStatus.ACTIVE) {
             await prisma.$transaction(async (tx) => {
                 await tx.adminSession.update({ where: { id: session.id }, data: { revokedAt: now } });
-                await AuditService.record({ adminId: session.admin.id, action: AUDIT_ACTIONS.SESSION_REVOKED, entityType: "AdminSession", entityId: session.id, after: { reason: "account_inactive" }, ipAddress }, tx);
+                await AuditService.record({ adminId: session.admin.id, action: auditActions.SESSION_REVOKED, entityType: "AdminSession", entityId: session.id, after: { reason: "account_inactive" }, ipAddress }, tx);
             });
 
-            throw new ForbiddenError("This admin account is not active.", ERROR_CODES.ACCOUNT_NOT_ACTIVE);
+            throw new ForbiddenError("This admin account is not active.", errorCodes.ACCOUNT_NOT_ACTIVE);
         }
 
         const { accessToken, refreshToken: newRefreshToken, refreshTokenHash, expiresAt: slidingExpiresAt } = await TokenService.generateTokenPair("admin", session.admin.id, {});
@@ -354,7 +354,7 @@ export default class AdminService {
             data: { refreshToken: refreshTokenHash, expiresAt, ipAddress, userAgent },
         });
 
-        if (count === 0) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", ERROR_CODES.INVALID_REFRESH_TOKEN);
+        if (count === 0) throw new UnauthorizedError("Your session is invalid or has expired. Please sign in again.", errorCodes.INVALID_REFRESH_TOKEN);
 
         return { admin: createAdminResponse(session.admin), accessToken, refreshToken: newRefreshToken, expiresAt };
     }
@@ -369,7 +369,7 @@ export default class AdminService {
         // Only recorded when this request is the one that ended the session.
         await prisma.$transaction(async (tx) => {
             const { count } = await tx.adminSession.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: new Date() } });
-            if (count > 0) await AuditService.record({ adminId: session.adminId, action: AUDIT_ACTIONS.SIGN_OUT, entityType: "AdminSession", entityId: session.id, ipAddress }, tx);
+            if (count > 0) await AuditService.record({ adminId: session.adminId, action: auditActions.SIGN_OUT, entityType: "AdminSession", entityId: session.id, ipAddress }, tx);
         });
     }
 }
