@@ -3,11 +3,11 @@ import { database, defineRailway, github, preserve, project, service, volume } f
 // Railway Infrastructure as Code. Preview with `railway config plan`, apply with `railway config apply`.
 // The same file describes every environment: staging deploys the staging branch, production deploys main.
 
-const REPO = "ammarsarhan/rehletak";
-const REGION = "europe-west4-drams3a"; // EU West, closest to Neon (aws-eu-central-1)
+const repo = "ammarsarhan/rehletak";
+const region = "europe-west4-drams3a"; // EU West, closest to Neon (aws-eu-central-1)
 
 // Anything that can change the backend build triggers a deploy; dashboard and storefront changes don't.
-const BACKEND_WATCH = [
+const backendWatch = [
   "/backend/**",
   "/package.json",
   "/pnpm-lock.yaml",
@@ -23,8 +23,8 @@ const redisStart = (flags: string) =>
 // depending on how Railway first created it: the official image, a volume, the password variables and REDIS_URL.
 // The private endpoint matches the docker-compose service name.
 const redisService = (name: string, flags: string) => {
-  const node = database(name, "redis", { image: "redis:8.2", output: "REDIS_URL", defaultMountPath: "/data", region: REGION });
-  const data = volume(`${name}-volume`, { region: REGION, sizeMB: 500 });
+  const node = database(name, "redis", { image: "redis:8.2", output: "REDIS_URL", defaultMountPath: "/data", region: region });
+  const data = volume(`${name}-volume`, { region: region, sizeMB: 500 });
 
   // Spread, don't replace: database() puts the region in deploy.
   node.deploy = { ...node.deploy, startCommand: redisStart(flags) };
@@ -56,15 +56,15 @@ export default defineRailway((ctx) => {
   // environment, never stored here.
   const backend = (name: string, deploy: { start: string; preDeploy?: string; healthcheck?: string }) =>
     service(name, {
-      source: github(REPO, { branch: production ? "main" : "staging", checkSuites: true }),
+      source: github(repo, { branch: production ? "main" : "staging", checkSuites: true }),
       build: {
         builder: "RAILPACK",
         buildCommand: "pnpm turbo run build --filter=@rehletak/backend",
-        watchPatterns: BACKEND_WATCH,
+        watchPatterns: backendWatch,
       },
       ...deploy,
       healthcheckTimeout: deploy.healthcheck ? 60 : undefined,
-      replicas: { [REGION]: 1 },
+      replicas: { [region]: 1 },
       env: {
         NODE_ENV: "production",
         DATABASE_URL: ctx.shared.DATABASE_URL,

@@ -38,7 +38,7 @@ export const groups: NavGroup[] = [
         label: "System",
         items: [
             { href: "/settings", label: "Settings", icon: IconSettings },
-            { href: "/audit-logs", label: "Audit logs", icon: IconHistory },
+            { href: "/logs", label: "Audit logs", icon: IconHistory },
         ],
     },
 ];

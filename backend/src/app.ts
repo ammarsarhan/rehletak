@@ -12,6 +12,7 @@ import { requireOrigin } from "./shared/middleware/origin.js";
 
 import health from "./domains/health/health.routes.js";
 import admin from "./domains/admin/admin.routes.js";
+import logs from "./domains/audit/audit.routes.js";
 
 // The staff and admin dashboards of this environment, the only browser origins allowed to call the API with cookies.
 const origins = (process.env.CORS_ORIGINS ?? "").split(",").map(o => o.trim()).filter(Boolean);
@@ -69,7 +70,8 @@ const app = new Hono()
     }, 500);
   })
   .route("/health", health)
-  .route("/admin", admin);
+  .route("/admin", admin)
+  .route("/admin/logs", logs);
 
 export type AppType = typeof app;
 export default app;
